@@ -1,0 +1,161 @@
+@model PetParadise.Models.Order
+@{
+    ViewData["Title"] = $"ใบเสร็จคำสั่งซื้อ #{Model.OrderId}";
+    var payment = Model.Payments.FirstOrDefault();
+    var deliveryNote = ViewBag.DeliveryNote as PetParadise.Models.DeliveryTrackingNote;
+    decimal totalWeight = Model.Orderitems.Sum(i => i.Quantity * (i.Product?.Weight ?? 0m));
+}
+
+<style>
+    @@media print {
+        header, footer, .no-print {
+            display: none !important;
+        }
+        body {
+            background: #ffffff !important;
+        }
+        .receipt-card {
+            box-shadow: none !important;
+            border: 1px solid #ccc !important;
+        }
+    }
+</style>
+
+<div class="container mt-4 mb-5" style="max-width: 820px;">
+    <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+        <a asp-action="Tracking" asp-route-orderId="@Model.OrderId" class="btn btn-outline-secondary btn-sm">
+            &larr; กลับหน้าติดตามคำสั่งซื้อ
+        </a>
+        <button type="button" class="btn btn-primary fw-bold" onclick="window.print()">
+            🖨️ พิมพ์ใบเสร็จ / บันทึกเป็น PDF
+        </button>
+    </div>
+
+    <div class="card shadow-sm p-4 receipt-card bg-white">
+        <!-- ส่วนหัวใบเสร็จ -->
+        <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
+            <div>
+                <h3 class="fw-bold mb-1" style="color: #0d9488;">🐾 Pet Paradise</h3>
+                <div class="small text-muted">บจก. เพ็ท พาราไดซ์ — ร้านค้าออนไลน์สำหรับจำหน่ายสินค้าและอาหารสัตว์เลี้ยง</div>
+                <div class="small text-muted">โทร: 080-000-0000 | อีเมล: contact@petparadise.com</div>
+            </div>
+            <div class="text-end">
+                <h5 class="fw-bold mb-1">ใบสรุปคำสั่งซื้อ / ใบเสร็จรับเงิน</h5>
+                <div class="fw-bold text-primary">เลขที่คำสั่งซื้อ: #@Model.OrderId</div>
+                <div class="small text-muted">วันที่สั่งซื้อ: @Model.OrderDate?.ToString("dd/MM/yyyy HH:mm")</div>
+                <div class="mt-1">
+                    <span class="badge @(Model.Status == "Cancelled" ? "bg-danger" : Model.Status == "Completed" ? "bg-success" : "bg-info text-dark")">
+                        สถานะ: @Model.Status
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ข้อมูลลูกค้าและการชำระเงิน -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-7">
+                <div class="p-3 bg-light rounded h-100">
+                    <h6 class="fw-bold small text-uppercase text-muted mb-2">ข้อมูลผู้รับและสถานที่จัดส่ง</h6>
+                    <div class="fw-bold">@(Model.Address?.RecipientName ?? $"{Model.User?.FirstName} {Model.User?.LastName}")</div>
+                    <div class="small">เบอร์โทรศัพท์: @(Model.Address?.Phone ?? Model.User?.Phone ?? "-")</div>
+                    <div class="small text-muted mt-1">
+                        @(Model.Address?.AddressDetail)
+                        @(Model.Address?.District != "-" ? Model.Address?.District : "")
+                        @(Model.Address?.Province != "-" ? Model.Address?.Province : "")
+                        @(Model.Address?.PostalCode != "-" ? Model.Address?.PostalCode : "")
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="p-3 bg-light rounded h-100">
+                    <h6 class="fw-bold small text-uppercase text-muted mb-2">ข้อมูลการชำระเงินและจัดส่ง</h6>
+                    <div class="small mb-1"><strong>ช่องทางชำระเงิน:</strong> @(payment?.PaymentMethod ?? "Bank Transfer")</div>
+                    <div class="small mb-1"><strong>สถานะการชำระเงิน:</strong> @(payment?.PaymentStatus ?? "Pending")</div>
+                    <div class="small mb-1"><strong>น้ำหนักสินค้ารวม:</strong> @totalWeight.ToString("N2") กิโลกรัม</div>
+                    @if (deliveryNote != null && !string.IsNullOrEmpty(deliveryNote.TrackingNumber))
+                    {
+                        <div class="small"><strong>เลขพัสดุ:</strong> @deliveryNote.TrackingNumber @(string.IsNullOrEmpty(deliveryNote.CarrierName) ? "" : $"({deliveryNote.CarrierName})")</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- ตารางรายการสินค้า -->
+        <div class="table-responsive mb-3">
+            <table class="table table-bordered align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;" class="text-center">#</th>
+                        <th>รายการสินค้า</th>
+                        <th class="text-center">น้ำหนัก/ชิ้น</th>
+                        <th class="text-end">ราคาต่อชิ้น</th>
+                        <th class="text-center">จำนวน</th>
+                        <th class="text-end">จำนวนเงิน</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ int idx = 1; }
+                    @foreach (var item in Model.Orderitems)
+                    {
+                        <tr>
+                            <td class="text-center">@idx</td>
+                            <td class="fw-semibold">@(item.Product?.ProductName ?? "สินค้าในคำสั่งซื้อ")</td>
+                            <td class="text-center small text-muted">@((item.Product?.Weight ?? 0m).ToString("N2")) kg</td>
+                            <td class="text-end">@item.UnitPrice.ToString("N2") ฿</td>
+                            <td class="text-center">@item.Quantity</td>
+                            <td class="text-end fw-bold">@((item.Quantity * item.UnitPrice).ToString("N2")) ฿</td>
+                        </tr>
+                        idx++;
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- สรุปยอดคำนวณ -->
+        <div class="row justify-content-end">
+            <div class="col-md-6">
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">ยอดรวมราคาสินค้า (Subtotal):</td>
+                            <td class="text-end fw-semibold">@Model.Subtotal.ToString("N2") บาท</td>
+                        </tr>
+                        @if (Model.Discount != null && Model.Discount > 0)
+                        {
+                            <tr class="text-success">
+                                <td>ส่วนลดโปรโมชั่น @(Model.Promotion != null ? $"({Model.Promotion.PromotionName})" : ""):</td>
+                                <td class="text-end fw-bold">-@Model.Discount?.ToString("N2") บาท</td>
+                            </tr>
+                        }
+                        <tr>
+                            <td class="text-muted">ค่าจัดส่งตามน้ำหนัก (@totalWeight.ToString("N2") kg):</td>
+                            <td class="text-end fw-semibold">
+                                @if ((Model.ShippingFee ?? 0) == 0 && Model.Promotion?.PromotionType == "FreeShipping")
+                                {
+                                    <span class="text-success">0.00 บาท (ส่งฟรี)</span>
+                                }
+                                else
+                                {
+                                    <span>@((Model.ShippingFee ?? 0).ToString("N2")) บาท</span>
+                                }
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">ภาษีมูลค่าเพิ่ม (VAT 7%):</td>
+                            <td class="text-end fw-semibold">@((Model.Vat ?? 0).ToString("N2")) บาท</td>
+                        </tr>
+                        <tr class="border-top">
+                            <td class="fw-bold fs-5 pt-2">ยอดชำระสุทธิ (Net Total):</td>
+                            <td class="text-end fw-bold fs-5 text-danger pt-2">@Model.TotalAmount.ToString("N2") บาท</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <hr class="mt-4" />
+        <div class="text-center text-muted small">
+            ขอบคุณที่ใช้บริการ <strong>Pet Paradise</strong> — ดูแลสัตว์เลี้ยงที่คุณรักด้วยสินค้าคุณภาพ
+        </div>
+    </div>
+</div>

@@ -1,0 +1,24 @@
+{
+  "WarehouseIssues": [
+    {
+      "Id": 1,
+      "ProductId": 1,
+      "ProductName": "\u0E2B\u0E21\u0E32\u0E2D\u0E32\u0E2B\u0E32\u0E23",
+      "IssueType": "\u0E2A\u0E34\u0E19\u0E04\u0E49\u0E32\u0E0A\u0E33\u0E23\u0E38\u0E14/\u0E40\u0E2A\u0E35\u0E22\u0E2B\u0E32\u0E22",
+      "Detail": "2",
+      "ReportedBy": "2",
+      "ReportedAt": "2026-11-18T14:21:12.8016653+07:00",
+      "IsResolved": true
+    }
+  ],
+  "DeliveryNotes": [
+    {
+      "OrderId": 3,
+      "TrackingNumber": "555555555",
+      "CarrierName": "trunder",
+      "DeliveryIssue": "",
+      "UpdatedAt": "2026-11-18T14:37:27.0519861+07:00"
+    }
+  ],
+  "PromoCodes": {}
+}

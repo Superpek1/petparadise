@@ -1,8 +1,219 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@model IEnumerable<PetParadise.Models.Product>
+@{
+    ViewData["Title"] = "หน้าแรก";
+    var bestSellers = ViewBag.BestSellers as List<PetParadise.Models.Product> ?? new List<PetParadise.Models.Product>();
+    var promotions = ViewBag.Promotions as List<PetParadise.Models.Promotion> ?? new List<PetParadise.Models.Promotion>();
+    var categories = ViewBag.Categories as List<PetParadise.Models.Category> ?? new List<PetParadise.Models.Category>();
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container">
+    <!-- 1. แบนเนอร์หลัก (Hero Banner) -->
+    <div class="p-4 p-md-5 mb-5 rounded-4 text-white shadow-sm" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 60%, #115e59 100%);">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <span class="badge bg-warning text-dark fw-bold mb-2 px-3 py-2 rounded-pill">🐾 Pet Paradise E-Commerce</span>
+                <h1 class="display-6 fw-bold mb-3">ร้านค้าออนไลน์สำหรับจำหน่ายสินค้าและอาหารสัตว์เลี้ยง</h1>
+                <p class="lead mb-4 opacity-90">
+                    ครบครันทั้งอาหารสุนัข อาหารแมว ขนม อุปกรณ์ ของเล่น และผลิตภัณฑ์ดูแลสัตว์เลี้ยง
+                    พร้อมโปรโมชั่นพิเศษส่วนลดสมาชิกใหม่ ส่งฟรี และส่วนลดเดือนเกิดสัตว์เลี้ยงที่คุณรัก!
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Product" asp-action="Index" class="btn btn-light btn-lg fw-bold px-4" style="color: #0f766e;">
+                        เลือกซื้อสินค้าทั้งหมด &rarr;
+                    </a>
+                    <a asp-controller="Promotion" asp-action="Index" class="btn btn-outline-light btn-lg px-4">
+                        ดูโปรโมชั่นพิเศษ
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 text-center d-none d-lg-block">
+                <div style="font-size: 6rem;">🐶🐱🦴</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- หมวดหมู่ด่วน -->
+    @if (categories.Any())
+    {
+        <div class="mb-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-bold mb-0">หมวดหมู่สินค้า</h4>
+                <a asp-controller="Product" asp-action="Index" class="text-decoration-none fw-semibold" style="color: #0d9488;">ดูทั้งหมด &rarr;</a>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var cat in categories)
+                {
+                    <a asp-controller="Product" asp-action="Index" asp-route-categoryId="@cat.CategoryId"
+                       class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-medium">
+                        🐾 @cat.CategoryName
+                    </a>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- 2. โปรโมชั่นพิเศษ (Promotions) -->
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0">🎁 โปรโมชั่นพิเศษประจำร้าน</h4>
+            <a asp-controller="Promotion" asp-action="Index" class="text-decoration-none fw-semibold" style="color: #0d9488;">ดูเงื่อนไขทั้งหมด &rarr;</a>
+        </div>
+        <div class="row g-3">
+            @foreach (var promo in promotions.Take(5))
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 border-warning shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="badge bg-warning text-dark fw-bold">@promo.PromotionType</span>
+                                @if (promo.PromotionType == "FreeShipping")
+                                {
+                                    <span class="badge bg-success">ส่งฟรี!</span>
+                                }
+                                else if (promo.DiscountPercent > 0)
+                                {
+                                    <span class="badge bg-danger">ลด @promo.DiscountPercent?.ToString("N0")%</span>
+                                }
+                                else if (promo.DiscountAmount > 0)
+                                {
+                                    <span class="badge bg-danger">ลด @promo.DiscountAmount?.ToString("N0") ฿</span>
+                                }
+                            </div>
+                            <h6 class="fw-bold text-dark mb-1">@promo.PromotionName</h6>
+                            <p class="small text-muted mb-0">
+                                ขั้นต่ำ @((promo.MinPurchase ?? 0).ToString("N0")) บาท
+                                @if (promo.MaxDiscount > 0)
+                                {
+                                    <span>• ลดสูงสุด @promo.MaxDiscount?.ToString("N0") บาท</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- 3. สินค้าขายดี (Best Selling Products) -->
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0">🔥 สินค้าขายดี (Best Sellers)</h4>
+            <a asp-controller="Product" asp-action="Index" class="text-decoration-none fw-semibold" style="color: #0d9488;">ดูสินค้าทั้งหมด &rarr;</a>
+        </div>
+        <div class="row row-cols-1 row-cols-md-4 g-4">
+            @foreach (var item in bestSellers)
+            {
+                var imgUrl = item.Productimages.FirstOrDefault()?.ImageUrl;
+                <div class="col">
+                    <div class="card h-100 product-card shadow-sm">
+                        <div class="product-img-box position-relative">
+                            <span class="badge bg-danger position-absolute top-0 start-0 m-2">ขายดี</span>
+                            @if (!string.IsNullOrEmpty(imgUrl))
+                            {
+                                <img src="@imgUrl" alt="@item.ProductName" />
+                            }
+                            else
+                            {
+                                <div class="text-center text-muted">
+                                    <div class="fs-1 opacity-50">🐾</div>
+                                    <small class="opacity-75">ไม่มีรูปภาพ</small>
+                                </div>
+                            }
+                        </div>
+                        <div class="card-body d-flex flex-column p-3">
+                            <span class="badge rounded-pill border mb-2 align-self-start" style="background-color: #f0fdfa; color: #0f766e;">
+                                @item.Category?.CategoryName
+                            </span>
+                            <h6 class="fw-semibold text-dark mb-1 text-truncate">@item.ProductName</h6>
+                            <div class="small mb-2">
+                                @if (item.Reviews != null && item.Reviews.Any())
+                                {
+                                    double avg = item.Reviews.Average(r => r.Rating);
+                                    <span class="text-warning fw-bold">⭐ @avg.ToString("0.0")</span>
+                                    <span class="text-muted">(@item.Reviews.Count รีวิว)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted opacity-75">☆ ยังไม่มีรีวิว</span>
+                                }
+                            </div>
+                            <div class="mt-auto pt-2">
+                                <div class="fs-5 fw-bold mb-2" style="color: #0d9488;">
+                                    @item.Price.ToString("N2") <small class="fs-6 fw-normal text-muted">฿</small>
+                                </div>
+                                <div class="d-grid gap-1">
+                                    <a asp-controller="Product" asp-action="Detail" asp-route-id="@item.ProductId" class="btn btn-pp-outline btn-sm">ดูรายละเอียด</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- 4. สินค้าแนะนำ (Recommended Products) -->
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0">✨ สินค้าแนะนำสำหรับสัตว์เลี้ยง</h4>
+            <a asp-controller="Product" asp-action="Index" class="text-decoration-none fw-semibold" style="color: #0d9488;">ดูทั้งหมด &rarr;</a>
+        </div>
+        <div class="row row-cols-1 row-cols-md-4 g-4">
+            @foreach (var item in Model)
+            {
+                var imgUrl = item.Productimages.FirstOrDefault()?.ImageUrl;
+                <div class="col">
+                    <div class="card h-100 product-card shadow-sm">
+                        <div class="product-img-box">
+                            @if (!string.IsNullOrEmpty(imgUrl))
+                            {
+                                <img src="@imgUrl" alt="@item.ProductName" />
+                            }
+                            else
+                            {
+                                <div class="text-center text-muted">
+                                    <div class="fs-1 opacity-50">🐾</div>
+                                    <small class="opacity-75">ไม่มีรูปภาพ</small>
+                                </div>
+                            }
+                        </div>
+                        <div class="card-body d-flex flex-column p-3">
+                            <span class="badge rounded-pill border mb-2 align-self-start" style="background-color: #f0fdfa; color: #0f766e;">
+                                @item.Category?.CategoryName
+                            </span>
+                            <h6 class="fw-semibold text-dark mb-1 text-truncate">@item.ProductName</h6>
+                            <div class="small mb-2">
+                                @if (item.Reviews != null && item.Reviews.Any())
+                                {
+                                    double avg = item.Reviews.Average(r => r.Rating);
+                                    <span class="text-warning fw-bold">⭐ @avg.ToString("0.0")</span>
+                                    <span class="text-muted">(@item.Reviews.Count รีวิว)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted opacity-75">☆ ยังไม่มีรีวิว</span>
+                                }
+                            </div>
+                            <div class="mt-auto pt-2">
+                                <div class="fs-5 fw-bold mb-2" style="color: #0d9488;">
+                                    @item.Price.ToString("N2") <small class="fs-6 fw-normal text-muted">฿</small>
+                                </div>
+                                <div class="d-flex gap-1">
+                                    <a asp-controller="Product" asp-action="Detail" asp-route-id="@item.ProductId" class="btn btn-pp-outline btn-sm flex-grow-1">รายละเอียด</a>
+                                    @if (item.StockQuantity > 0)
+                                    {
+                                        <form asp-controller="Cart" asp-action="AddToCart" method="post">
+                                            <input type="hidden" name="productId" value="@item.ProductId" />
+                                            <input type="hidden" name="quantity" value="1" />
+                                            <button type="submit" class="btn btn-pp-primary btn-sm">+🛒</button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
 </div>

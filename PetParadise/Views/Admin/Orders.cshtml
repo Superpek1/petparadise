@@ -45,7 +45,13 @@
                         {
                             var payment = ord.Payments.FirstOrDefault();
                             <tr>
-                                <td class="fw-bold">#@ord.OrderId<br /><small class="text-muted">@ord.OrderDate?.ToString("dd/MM/yy HH:mm")</small></td>
+                                <td class="fw-bold">
+                                    #@ord.OrderId<br />
+                                    <small class="text-muted">@ord.OrderDate?.ToString("dd/MM/yy HH:mm")</small><br />
+                                    <a asp-controller="Order" asp-action="Receipt" asp-route-orderId="@ord.OrderId" target="_blank" class="btn btn-outline-dark btn-sm mt-1 py-0 px-2" style="font-size: 0.75rem;">
+                                        🖨️ ใบเสร็จ
+                                    </a>
+                                </td>
                                 <td>
                                     <strong>@ord.Address.RecipientName</strong> (@ord.Address.Phone)<br />
                                     <small class="text-muted">@ord.Address.AddressDetail @ord.Address.District @ord.Address.Province @ord.Address.PostalCode</small>

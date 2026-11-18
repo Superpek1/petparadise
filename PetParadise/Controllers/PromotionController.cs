@@ -15,9 +15,11 @@ public class PromotionController : Controller
     [HttpGet]
     public IActionResult Index()
     {
-        // ใช้ p.Status ตามโมเดลจริง
+        PromotionHelper.EnsureDefaultPromotions(_db);
+
         var promos = (from p in _db.Promotions
                       where p.Status == true
+                      orderby p.PromotionId
                       select p).ToList();
 
         return View(promos);

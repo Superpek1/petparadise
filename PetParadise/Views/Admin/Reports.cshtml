@@ -1,0 +1,188 @@
+@model IEnumerable<PetParadise.Models.Order>
+@{
+    ViewData["Title"] = "รายงานระบบ";
+    var topSelling = ViewBag.TopSellingProducts as List<PetParadise.Models.TopSellingProductSummary> ?? new List<PetParadise.Models.TopSellingProductSummary>();
+    var inventory = ViewBag.AllProductsInventory as List<PetParadise.Models.Product> ?? new List<PetParadise.Models.Product>();
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">📊 รายงานระบบ (ยอดขาย, คำสั่งซื้อ, สินค้าขายดี, สินค้าคงเหลือ)</h3>
+        <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+    </div>
+
+    <!-- 1. รายงานยอดขาย & รายงานจำนวนคำสั่งซื้อ -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0 text-white">1. รายงานสรุปยอดขาย (ไม่รวมออเดอร์ที่ยกเลิก)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>ยอดราคาสินค้ารวม (Subtotal):</span>
+                        <strong>@(((decimal)ViewBag.TotalSubtotal).ToString("N2")) บาท</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 text-danger">
+                        <span>ส่วนลดโปรโมชั่นรวม (Discount):</span>
+                        <strong>-@(((decimal)ViewBag.TotalDiscount).ToString("N2")) บาท</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>ค่าจัดส่งรวม (Shipping Fee):</span>
+                        <strong>@(((decimal)ViewBag.TotalShipping).ToString("N2")) บาท</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>ภาษีมูลค่าเพิ่มรวม (VAT 7%):</span>
+                        <strong>@(((decimal)ViewBag.TotalVat).ToString("N2")) บาท</strong>
+                    </div>
+                    <hr />
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0">ยอดขายสุทธิรวมทั้งสิ้น:</h5>
+                        <h4 class="fw-bold text-success mb-0">@(((decimal)ViewBag.TotalSales).ToString("N2")) บาท</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0 text-white">2. รายงานจำนวนคำสั่งซื้อแยกตามสถานะ</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 text-center">
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted">คำสั่งซื้อทั้งหมด</div>
+                                <div class="fs-5 fw-bold">@ViewBag.TotalOrders</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted">รอชำระเงิน (Pending)</div>
+                                <div class="fs-5 fw-bold text-warning">@ViewBag.PendingCount</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted">ชำระเงินแล้ว (Paid)</div>
+                                <div class="fs-5 fw-bold text-info">@ViewBag.PaidCount</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted">กำลังเตรียม (Preparing)</div>
+                                <div class="fs-5 fw-bold text-primary">@ViewBag.PreparingCount</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted">กำลังจัดส่ง (Shipped)</div>
+                                <div class="fs-5 fw-bold text-secondary">@ViewBag.ShippedCount</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-light">
+                                <div class="small text-muted">สำเร็จ / ยกเลิก</div>
+                                <div class="fs-5 fw-bold">
+                                    <span class="text-success">@ViewBag.CompletedCount</span> / <span class="text-danger">@ViewBag.CancelledCount</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. รายงานสินค้าขายดี -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0 text-white">3. รายงานสินค้าขายดี (Top Selling Products Report)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>อันดับ</th>
+                            <th>รหัสสินค้า</th>
+                            <th>ชื่อสินค้า</th>
+                            <th>หมวดหมู่</th>
+                            <th class="text-end">ราคาต่อชิ้น</th>
+                            <th class="text-center">จำนวนที่ขายได้</th>
+                            <th class="text-end">ยอดขายรวม</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ int rank = 1; }
+                        @foreach (var item in topSelling)
+                        {
+                            <tr>
+                                <td class="fw-bold">#@rank</td>
+                                <td>#@item.ProductId</td>
+                                <td class="fw-bold">@item.ProductName</td>
+                                <td>@item.CategoryName</td>
+                                <td class="text-end">@item.UnitPrice.ToString("N2") ฿</td>
+                                <td class="text-center"><span class="badge bg-success">@item.TotalQuantitySold ชิ้น</span></td>
+                                <td class="text-end fw-bold text-primary">@item.TotalRevenue.ToString("N2") ฿</td>
+                            </tr>
+                            rank++;
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. รายงานสินค้าคงเหลือ -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0 text-white">4. รายงานสินค้าคงเหลือในคลัง (Inventory Stock Report)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>รหัสสินค้า</th>
+                            <th>ชื่อสินค้า</th>
+                            <th>หมวดหมู่</th>
+                            <th class="text-end">น้ำหนัก (kg)</th>
+                            <th class="text-end">ราคา (฿)</th>
+                            <th class="text-center">จำนวนคงเหลือ</th>
+                            <th class="text-center">สถานะสต็อก</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in inventory)
+                        {
+                            <tr>
+                                <td>#@p.ProductId</td>
+                                <td class="fw-bold">@p.ProductName</td>
+                                <td>@p.Category?.CategoryName</td>
+                                <td class="text-end">@p.Weight.ToString("N2")</td>
+                                <td class="text-end">@p.Price.ToString("N2")</td>
+                                <td class="text-center fw-bold @(p.StockQuantity <= 5 ? "text-danger" : "text-success")">@p.StockQuantity ชิ้น</td>
+                                <td class="text-center">
+                                    @if (p.StockQuantity == 0)
+                                    {
+                                        <span class="badge bg-danger">สินค้าหมด</span>
+                                    }
+                                    else if (p.StockQuantity <= 5)
+                                    {
+                                        <span class="badge bg-warning text-dark">ใกล้หมด (≤ 5)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">ปกติ</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

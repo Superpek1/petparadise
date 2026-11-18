@@ -57,7 +57,7 @@ public class AccountController : Controller
                 "Staff" => RedirectToAction("Orders", "Admin"),
                 "Warehouse" => RedirectToAction("Warehouse", "Admin"),
                 "Delivery" => RedirectToAction("Delivery", "Admin"),
-                _ => RedirectToAction("Index", "Product")
+                _ => RedirectToAction("Index", "Home")
             };
         }
 
@@ -109,7 +109,7 @@ public class AccountController : Controller
     public IActionResult Logout()
     {
         HttpContext.Session.Clear();
-        return RedirectToAction(nameof(Login));
+        return RedirectToAction("Index", "Home");
     }
 
     // 4. หน้าข้อมูลส่วนตัว (Profile)
@@ -125,12 +125,79 @@ public class AccountController : Controller
         var userProfile = (from u in _db.Users
                            .Include(u => u.Addresses)
                            .Include(u => u.Orders)
+                           .Include(u => u.Pets)
                            where u.UserId == userId
                            select u).FirstOrDefault();
 
         if (userProfile == null) return NotFound();
 
         return View(userProfile);
+    }
+
+    // 4.1 แก้ไขข้อมูลส่วนตัว (Edit Profile)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult EditProfile(int userId, string firstName, string lastName, string email, string? phone, string? newPassword)
+    {
+        int? currentUserId = HttpContext.Session.GetInt32("UserId");
+        if (currentUserId == null || currentUserId != userId)
+            return RedirectToAction(nameof(Login));
+
+        var user = _db.Users.Find(userId);
+        if (user != null)
+        {
+            user.FirstName = firstName.Trim();
+            user.LastName = lastName.Trim();
+            user.Email = email.Trim();
+            user.Phone = phone?.Trim();
+            if (!string.IsNullOrWhiteSpace(newPassword))
+            {
+                user.Password = newPassword.Trim();
+            }
+            _db.SaveChanges();
+            TempData["Success"] = "อัปเดตข้อมูลส่วนตัวเรียบร้อยแล้ว";
+        }
+        return RedirectToAction(nameof(Profile));
+    }
+
+    // 4.2 ลงทะเบียนข้อมูลสัตว์เลี้ยง (สำหรับโปรโมชั่น Birthday Pet)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult AddPet(int userId, string petName, string petType, DateOnly? birthDate)
+    {
+        int? currentUserId = HttpContext.Session.GetInt32("UserId");
+        if (currentUserId == null || currentUserId != userId)
+            return RedirectToAction(nameof(Login));
+
+        if (!string.IsNullOrWhiteSpace(petName) && !string.IsNullOrWhiteSpace(petType))
+        {
+            _db.Pets.Add(new Pet
+            {
+                UserId = userId,
+                PetName = petName.Trim(),
+                PetType = petType.Trim(),
+                BirthDate = birthDate
+            });
+            _db.SaveChanges();
+            TempData["Success"] = $"ลงทะเบียนสัตว์เลี้ยง '{petName}' เรียบร้อยแล้ว";
+        }
+        return RedirectToAction(nameof(Profile));
+    }
+
+    // 4.3 ลบข้อมูลสัตว์เลี้ยง
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult DeletePet(int petId)
+    {
+        int? currentUserId = HttpContext.Session.GetInt32("UserId");
+        var pet = _db.Pets.Find(petId);
+        if (pet != null && pet.UserId == currentUserId)
+        {
+            _db.Pets.Remove(pet);
+            _db.SaveChanges();
+            TempData["Success"] = "ลบข้อมูลสัตว์เลี้ยงเรียบร้อยแล้ว";
+        }
+        return RedirectToAction(nameof(Profile));
     }
 
     // 5. เพิ่มที่อยู่จัดส่งใหม่

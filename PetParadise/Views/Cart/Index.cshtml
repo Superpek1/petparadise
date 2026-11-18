@@ -3,6 +3,11 @@
 <div class="container mt-4">
     <h3 class="fw-bold mb-4">🛒 ตะกร้าสินค้าของคุณ</h3>
 
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-warning">@TempData["Error"]</div>
+    }
+
     @if (Model != null && Model.Any())
     {
         <div class="row g-4">
@@ -28,9 +33,27 @@
                                             <td>
                                                 <strong>@item.Product.ProductName</strong>
                                                 <small class="text-muted d-block">น้ำหนัก: @item.Product.Weight.ToString("N2") kg/ชิ้น</small>
+                                                @if (item.Quantity >= 3)
+                                                {
+                                                    <span class="badge bg-success mt-1">ซื้อ 3 ชิ้นขึ้นไป (เข้าเงื่อนไขโปรลด 15%)</span>
+                                                }
                                             </td>
                                             <td class="text-center">@item.Product.Price.ToString("N2") ฿</td>
-                                            <td class="text-center">@item.Quantity</td>
+                                            <td class="text-center">
+                                                <div class="d-inline-flex align-items-center gap-2">
+                                                    <form asp-action="UpdateQuantity" method="post" class="d-inline">
+                                                        <input type="hidden" name="cartItemId" value="@item.CartItemId" />
+                                                        <input type="hidden" name="delta" value="-1" />
+                                                        <button type="submit" class="btn btn-outline-secondary btn-sm px-2 py-0">-</button>
+                                                    </form>
+                                                    <span class="fw-bold px-2">@item.Quantity</span>
+                                                    <form asp-action="UpdateQuantity" method="post" class="d-inline">
+                                                        <input type="hidden" name="cartItemId" value="@item.CartItemId" />
+                                                        <input type="hidden" name="delta" value="1" />
+                                                        <button type="submit" class="btn btn-outline-secondary btn-sm px-2 py-0">+</button>
+                                                    </form>
+                                                </div>
+                                            </td>
                                             <td class="text-end fw-bold">@((item.Quantity * item.Product.Price).ToString("N2")) ฿</td>
                                             <td class="text-end">
                                                 <form asp-action="RemoveItem" method="post">
@@ -49,7 +72,7 @@
 
             <!-- กล่องสรุปยอด -->
             <div class="col-md-4">
-                <div class="card shadow-sm">
+                <div class="card shadow-sm mb-3">
                     <div class="card-header bg-dark text-white">
                         <h5 class="mb-0 text-white">สรุปยอดในตะกร้า</h5>
                     </div>
@@ -63,19 +86,34 @@
                             <span>@(((decimal)(ViewBag.TotalWeight ?? 0)).ToString("N2")) kg</span>
                         </div>
                         <div class="d-flex justify-content-between mb-3">
-                            <span class="text-muted">ค่าจัดส่งโดยประมาณ:</span>
+                            <span class="text-muted">ค่าจัดส่งตามน้ำหนัก:</span>
                             <span>@(((decimal)(ViewBag.ShippingFee ?? 0)).ToString("N2")) ฿</span>
                         </div>
                         <hr />
                         <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h6 class="fw-bold mb-0">ยอดรวมเบื้องต้น:</h6>
+                            <h6 class="fw-bold mb-0">ยอดรวมเบื้องต้น (ก่อนโปรโมชั่น/VAT):</h6>
                             <h5 class="fw-bold text-primary mb-0">@(((decimal)(ViewBag.GrandTotal ?? 0)).ToString("N2")) ฿</h5>
                         </div>
 
                         <div class="d-grid gap-2">
-                            <a asp-action="Checkout" class="btn btn-success fw-bold">ไปหน้าชำระเงิน</a>
+                            <a asp-action="Checkout" class="btn btn-success fw-bold">ไปหน้าชำระเงิน & เลือกโปรโมชั่น</a>
                             <a asp-controller="Product" asp-action="Index" class="btn btn-outline-secondary">เลือกซื้อสินค้าต่อ</a>
                         </div>
+                    </div>
+                </div>
+
+                <!-- ตารางอัตราค่าจัดส่งตามน้ำหนัก -->
+                <div class="card shadow-sm">
+                    <div class="card-body p-3">
+                        <h6 class="fw-bold small mb-2">📦 อัตราค่าจัดส่งตามน้ำหนักรวม</h6>
+                        <table class="table table-sm small mb-0">
+                            <tbody>
+                                <tr><td>ไม่เกิน 1 กิโลกรัม</td><td class="text-end fw-bold">40 บาท</td></tr>
+                                <tr><td>1.01 - 3 กิโลกรัม</td><td class="text-end fw-bold">60 บาท</td></tr>
+                                <tr><td>3.01 - 5 กิโลกรัม</td><td class="text-end fw-bold">80 บาท</td></tr>
+                                <tr><td>มากกว่า 5 กิโลกรัม</td><td class="text-end fw-bold">100 บาท</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

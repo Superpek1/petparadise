@@ -1,10 +1,11 @@
 @model IEnumerable<PetParadise.Models.Product>
 @{
     var ordersToPack = ViewBag.OrdersToPack as List<PetParadise.Models.Order> ?? new List<PetParadise.Models.Order>();
+    var warehouseIssues = ViewBag.WarehouseIssues as List<PetParadise.Models.WarehouseIssueNote> ?? new List<PetParadise.Models.WarehouseIssueNote>();
 }
 
 <div class="container mt-4">
-    <h3 class="fw-bold mb-4">ระบบจัดการคลังสินค้าและการแพ็กของ</h3>
+    <h3 class="fw-bold mb-4">ระบบจัดการคลังสินค้าและการแพ็กของ (Warehouse)</h3>
 
     @if (TempData["Success"] != null)
     {
@@ -14,7 +15,7 @@
     <!-- ส่วนที่ 1: รายการออเดอร์ที่รอจัดเตรียมและแพ็กสินค้า -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0 text-white">รายการสั่งซื้อที่ต้องจัดเตรียมและแพ็กสินค้า</h5>
+            <h5 class="mb-0 text-white">1. รายการสั่งซื้อที่ต้องตรวจสอบและจัดเตรียมแพ็กสินค้า</h5>
         </div>
         <div class="card-body">
             @if (ordersToPack.Any())
@@ -38,7 +39,7 @@
                                         <ul class="mb-0 ps-3">
                                             @foreach (var item in ord.Orderitems)
                                             {
-                                                <li><strong>@item.Product.ProductName</strong> — จำนวน <span class="text-danger fw-bold">@item.Quantity</span> ชิ้น</li>
+                                                <li><strong>@item.Product.ProductName</strong> — จำนวน <span class="text-danger fw-bold">@item.Quantity</span> ชิ้น (คงเหลือในคลัง: @item.Product.StockQuantity)</li>
                                             }
                                         </ul>
                                     </td>
@@ -71,9 +72,9 @@
     </div>
 
     <!-- ส่วนที่ 2: ตรวจสอบสต็อกสินค้าและบันทึกสินค้าเข้า-ออกคลัง -->
-    <div class="card shadow-sm">
+    <div class="card shadow-sm mb-4">
         <div class="card-header bg-dark text-white">
-            <h5 class="mb-0 text-white">ตรวจสอบจำนวนคงเหลือและบันทึกสินค้าเข้า-ออกคลัง</h5>
+            <h5 class="mb-0 text-white">2. ตรวจสอบจำนวนคงเหลือและบันทึกสินค้าเข้า-ออกคลัง</h5>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -84,7 +85,7 @@
                             <th>ชื่อสินค้า</th>
                             <th>หมวดหมู่</th>
                             <th>คงเหลือในคลัง</th>
-                            <th>แจ้งเตือน</th>
+                            <th>แจ้งเตือนสต็อก</th>
                             <th>รับเข้า (+) / ตัดออก (-)</th>
                         </tr>
                     </thead>
@@ -113,7 +114,7 @@
                                 <td>
                                     <form asp-action="UpdateStock" method="post" class="d-flex gap-1">
                                         <input type="hidden" name="productId" value="@p.ProductId" />
-                                        <input type="number" name="addQuantity" class="form-control form-control-sm" style="width: 90px;" placeholder="+/- จำนวน" required />
+                                        <input type="number" name="addQuantity" class="form-control form-control-sm" style="width: 100px;" placeholder="+/- จำนวน" required />
                                         <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>
                                     </form>
                                 </td>
@@ -122,6 +123,85 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- ส่วนที่ 3: ตรวจสอบสภาพสินค้า / วันหมดอายุ และแจ้งปัญหาให้ผู้ดูแลระบบทราบ -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0 fw-bold">3. ตรวจสอบสภาพสินค้า / วันหมดอายุ และแจ้งปัญหาสินค้าชำรุดหรือไม่เพียงพอ</h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="ReportWarehouseIssue" method="post" class="row g-2 align-items-end mb-4">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">เลือกสินค้า</label>
+                    <select name="productId" class="form-select form-select-sm" required>
+                        @foreach (var p in Model)
+                        {
+                            <option value="@p.ProductId">#@p.ProductId - @p.ProductName (คงเหลือ @p.StockQuantity)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">ประเภทปัญหาที่พบ</label>
+                    <select name="issueType" class="form-select form-select-sm">
+                        <option value="สินค้าชำรุด/เสียหาย">สินค้าชำรุด / เสียหาย</option>
+                        <option value="สินค้าใกล้หมดอายุ/หมดอายุ">สินค้าใกล้หมดอายุ / หมดอายุ</option>
+                        <option value="สินค้าไม่เพียงพอต่อคำสั่งซื้อ">สินค้าไม่เพียงพอต่อคำสั่งซื้อ</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">รายละเอียดสภาพสินค้า / วันหมดอายุ</label>
+                    <input type="text" name="detail" class="form-control form-control-sm" placeholder="ระบุเลขล็อต วันหมดอายุ หรือจำนวนที่ชำรุด..." required />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-danger btn-sm w-100 fw-bold">แจ้งผู้ดูแลระบบ</button>
+                </div>
+            </form>
+
+            @if (warehouseIssues.Any())
+            {
+                <h6 class="fw-bold small mb-2">ประวัติการแจ้งปัญหาคลังสินค้า:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>วันที่แจ้ง</th>
+                                <th>สินค้า</th>
+                                <th>ประเภทปัญหา</th>
+                                <th>รายละเอียด</th>
+                                <th>ผู้แจ้ง</th>
+                                <th>สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var issue in warehouseIssues)
+                            {
+                                <tr>
+                                    <td class="small">@issue.ReportedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td class="fw-bold">@issue.ProductName</td>
+                                    <td><span class="badge bg-warning text-dark">@issue.IssueType</span></td>
+                                    <td>@issue.Detail</td>
+                                    <td class="small">@issue.ReportedBy</td>
+                                    <td>
+                                        @if (issue.IsResolved)
+                                        {
+                                            <span class="badge bg-success">แก้ไขแล้ว</span>
+                                        }
+                                        else
+                                        {
+                                            <form asp-action="ResolveWarehouseIssue" method="post" class="d-inline">
+                                                <input type="hidden" name="id" value="@issue.Id" />
+                                                <button type="submit" class="btn btn-outline-success btn-sm py-0">ทำเครื่องหมายว่าแก้ไขแล้ว</button>
+                                            </form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </div>
     </div>
 </div>

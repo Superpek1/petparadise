@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PetParadise.Models;
 
 namespace PetParadise.Controllers;
@@ -103,7 +104,52 @@ public class HomeController : Controller
 
     public IActionResult Index()
     {
-        return View();
+        PromotionHelper.EnsureDefaultPromotions(_db);
+
+        var activeProducts = _db.Products
+            .Include(p => p.Category)
+            .Include(p => p.Productimages)
+            .Include(p => p.Reviews)
+            .Where(p => p.Status == "Active")
+            .OrderByDescending(p => p.ProductId)
+            .ToList();
+
+        // สินค้าขายดี (คำนวณจากยอดขายจริงใน Orderitems ที่ไม่ถูกยกเลิก)
+        var bestSellerIds = _db.Orderitems
+            .Include(oi => oi.Order)
+            .Where(oi => oi.Order.Status != "Cancelled")
+            .GroupBy(oi => oi.ProductId)
+            .Select(g => new { ProductId = g.Key, TotalSold = g.Sum(x => x.Quantity) })
+            .OrderByDescending(x => x.TotalSold)
+            .Take(4)
+            .ToList();
+
+        var bestSellers = bestSellerIds
+            .Select(b => activeProducts.FirstOrDefault(p => p.ProductId == b.ProductId))
+            .Where(p => p != null)
+            .Cast<Product>()
+            .ToList();
+
+        if (bestSellers.Count < 4)
+        {
+            foreach (var p in activeProducts)
+            {
+                if (bestSellers.All(b => b.ProductId != p.ProductId))
+                {
+                    bestSellers.Add(p);
+                }
+                if (bestSellers.Count >= 4) break;
+            }
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        ViewBag.Promotions = _db.Promotions
+            .Where(p => p.Status == true && p.StartDate <= today && p.EndDate >= today)
+            .ToList();
+        ViewBag.BestSellers = bestSellers;
+        ViewBag.Categories = _db.Categories.ToList();
+
+        return View(activeProducts.Take(8).ToList());
     }
 
     public IActionResult Privacy()

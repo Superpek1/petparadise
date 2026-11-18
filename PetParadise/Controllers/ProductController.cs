@@ -17,7 +17,10 @@ public class ProductController : Controller
     [HttpGet]
     public IActionResult Index(int? categoryId, string? search)
     {
-        var query = from p in _db.Products.Include(p => p.Category).Include(p => p.Productimages)
+        var query = from p in _db.Products
+                        .Include(p => p.Category)
+                        .Include(p => p.Productimages)
+                        .Include(p => p.Reviews)
                     where p.Status == "Active"
                     select p;
 

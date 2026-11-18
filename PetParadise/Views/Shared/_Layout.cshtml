@@ -1,7 +1,23 @@
-﻿@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Http
+@inject PetParadise.Models.Csi402dbContext DbContext
 @{
     var currentRole = Context.Session.GetString("Role");
     var currentUsername = Context.Session.GetString("Username");
+    var currentUserId = Context.Session.GetInt32("UserId");
+    int cartItemCount = 0;
+    try
+    {
+        if (currentUserId != null)
+        {
+            cartItemCount = DbContext.Cartitems
+                .Where(ci => ci.Cart.UserId == currentUserId.Value)
+                .Sum(ci => (int?)ci.Quantity) ?? 0;
+        }
+    }
+    catch
+    {
+        cartItemCount = 0;
+    }
 }
 <!DOCTYPE html>
 <html lang="th" data-bs-theme="light">
@@ -18,7 +34,7 @@
     <header>
         <nav class="navbar navbar-expand-lg navbar-light navbar-modern sticky-top mb-4">
             <div class="container">
-                <a class="navbar-brand fw-bold fs-4 d-flex align-items-center gap-2" style="color: #0d9488;" asp-controller="Product" asp-action="Index">
+                <a class="navbar-brand fw-bold fs-4 d-flex align-items-center gap-2" style="color: #0d9488;" asp-controller="Home" asp-action="Index">
                     <span>🐾 PetParadise</span>
                     @if (!string.IsNullOrEmpty(currentRole) && currentRole != "Customer")
                     {
@@ -38,11 +54,13 @@
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Delivery">จัดส่ง</a></li>
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="AdminProduct" asp-action="Index">สินค้า</a></li>
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Promotions">โปรโมชั่น</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Reports">รายงาน</a></li>
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Users">ผู้ใช้งาน</a></li>
                         }
                         else if (currentRole == "Staff")
                         {
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Orders">ตรวจสอบออเดอร์</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Warehouse">เตรียม/แพ็กสินค้า</a></li>
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Product" asp-action="Index">ดูสินค้าหน้าร้าน</a></li>
                         }
                         else if (currentRole == "Warehouse")
@@ -55,7 +73,8 @@
                         }
                         else
                         {
-                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Product" asp-action="Index">หน้าร้านค้า</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Home" asp-action="Index">หน้าแรก</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Product" asp-action="Index">สินค้าทั้งหมด</a></li>
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Promotion" asp-action="Index">โปรโมชั่น</a></li>
                             <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Order" asp-action="Tracking">ติดตามคำสั่งซื้อ</a></li>
                         }
@@ -77,7 +96,10 @@
                                 <a class="btn btn-pp-outline btn-sm rounded-pill px-3" asp-controller="Account" asp-action="Profile">@currentUsername</a>
                             </li>
                             <li class="nav-item">
-                                <a class="btn btn-pp-primary btn-sm rounded-pill px-3" asp-controller="Cart" asp-action="Index">ตะกร้า</a>
+                                <a class="btn btn-pp-primary btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1" asp-controller="Cart" asp-action="Index">
+                                    <span>🛒 ตะกร้า</span>
+                                    <span class="badge rounded-pill @(cartItemCount > 0 ? "bg-warning text-dark" : "bg-light text-dark")">@cartItemCount</span>
+                                </a>
                             </li>
                             <li class="nav-item">
                                 <a class="btn btn-link text-danger text-decoration-none btn-sm" asp-controller="Account" asp-action="Logout">ออก</a>
@@ -86,7 +108,13 @@
                         else
                         {
                             <li class="nav-item">
-                                <a class="btn btn-pp-outline btn-sm rounded-pill px-3" asp-controller="Cart" asp-action="Index">🛒 ตะกร้า</a>
+                                <a class="btn btn-pp-outline btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1" asp-controller="Cart" asp-action="Index">
+                                    <span>🛒 ตะกร้า</span>
+                                    @if (cartItemCount > 0)
+                                    {
+                                        <span class="badge rounded-pill bg-danger text-white">@cartItemCount</span>
+                                    }
+                                </a>
                             </li>
                             <li class="nav-item">
                                 <a class="btn btn-pp-primary btn-sm rounded-pill px-4" asp-controller="Account" asp-action="Login">เข้าสู่ระบบ</a>

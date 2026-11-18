@@ -26,6 +26,39 @@ public class AdminController : Controller
         base.OnActionExecuting(context);
     }
 
+    private List<TopSellingProductSummary> GetTopSellingProducts(int limit = 10)
+    {
+        var products = _db.Products.Include(p => p.Category).ToList();
+        var soldByProduct = _db.Orderitems
+            .Include(oi => oi.Order)
+            .Where(oi => oi.Order.Status != "Cancelled")
+            .GroupBy(oi => oi.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                TotalQty = g.Sum(x => x.Quantity),
+                TotalRev = g.Sum(x => x.Quantity * x.UnitPrice)
+            })
+            .ToList()
+            .ToDictionary(x => x.ProductId, x => x);
+
+        return products
+            .Select(p => new TopSellingProductSummary
+            {
+                ProductId = p.ProductId,
+                ProductName = p.ProductName,
+                CategoryName = p.Category?.CategoryName ?? "-",
+                UnitPrice = p.Price,
+                TotalQuantitySold = soldByProduct.ContainsKey(p.ProductId) ? soldByProduct[p.ProductId].TotalQty : 0,
+                TotalRevenue = soldByProduct.ContainsKey(p.ProductId) ? soldByProduct[p.ProductId].TotalRev : 0m,
+                StockQuantity = p.StockQuantity
+            })
+            .OrderByDescending(x => x.TotalQuantitySold)
+            .ThenByDescending(x => x.TotalRevenue)
+            .Take(limit)
+            .ToList();
+    }
+
     // 1. แดชบอร์ดภาพรวม (เฉพาะ Admin)
     [HttpGet]
     public IActionResult Dashboard()
@@ -33,14 +66,58 @@ public class AdminController : Controller
         if (HttpContext.Session.GetString("Role") != "Admin")
             return RedirectToAction("Login", "Account");
 
+        PromotionHelper.EnsureDefaultPromotions(_db);
+
         ViewBag.TotalSales = _db.Orders.Where(o => o.Status != "Cancelled").Sum(o => (decimal?)o.TotalAmount) ?? 0;
         ViewBag.TotalOrders = _db.Orders.Count();
         ViewBag.PendingOrders = _db.Orders.Count(o => o.Status == "Pending");
         ViewBag.TotalCustomers = _db.Users.Count(u => u.Role == "Customer");
         ViewBag.LowStockProducts = _db.Products.Where(p => p.StockQuantity <= 5).ToList();
+        ViewBag.TopSellingProducts = GetTopSellingProducts(5);
+
+        var notes = PromotionHelper.LoadSystemNotes();
+        ViewBag.WarehouseIssues = notes.WarehouseIssues.Where(i => !i.IsResolved).OrderByDescending(i => i.ReportedAt).ToList();
 
         var recentOrders = _db.Orders.Include(o => o.User).OrderByDescending(o => o.OrderDate).Take(5).ToList();
         return View(recentOrders);
+    }
+
+    // 1.1 หน้ารายงาน (รายงานยอดขาย, รายงานจำนวนคำสั่งซื้อ, รายงานสินค้าขายดี, รายงานสินค้าคงเหลือ)
+    [HttpGet]
+    public IActionResult Reports()
+    {
+        if (HttpContext.Session.GetString("Role") != "Admin")
+            return RedirectToAction("Login", "Account");
+
+        var allOrders = _db.Orders
+            .Include(o => o.User)
+            .Include(o => o.Promotion)
+            .OrderByDescending(o => o.OrderDate)
+            .ToList();
+
+        var validOrders = allOrders.Where(o => o.Status != "Cancelled").ToList();
+
+        ViewBag.TotalSales = validOrders.Sum(o => o.TotalAmount);
+        ViewBag.TotalSubtotal = validOrders.Sum(o => o.Subtotal);
+        ViewBag.TotalDiscount = validOrders.Sum(o => o.Discount ?? 0m);
+        ViewBag.TotalShipping = validOrders.Sum(o => o.ShippingFee ?? 0m);
+        ViewBag.TotalVat = validOrders.Sum(o => o.Vat ?? 0m);
+
+        ViewBag.TotalOrders = allOrders.Count;
+        ViewBag.PendingCount = allOrders.Count(o => o.Status == "Pending");
+        ViewBag.PaidCount = allOrders.Count(o => o.Status == "Paid");
+        ViewBag.PreparingCount = allOrders.Count(o => o.Status == "Preparing");
+        ViewBag.ShippedCount = allOrders.Count(o => o.Status == "Shipped");
+        ViewBag.CompletedCount = allOrders.Count(o => o.Status == "Completed");
+        ViewBag.CancelledCount = allOrders.Count(o => o.Status == "Cancelled");
+
+        ViewBag.TopSellingProducts = GetTopSellingProducts(20);
+        ViewBag.AllProductsInventory = _db.Products
+            .Include(p => p.Category)
+            .OrderBy(p => p.StockQuantity)
+            .ToList();
+
+        return View(allOrders);
     }
 
     // 2. จัดการคำสั่งซื้อและตรวจการชำระเงิน (Admin & Staff)
@@ -65,12 +142,12 @@ public class AdminController : Controller
         return View(query.OrderByDescending(o => o.OrderDate).ToList());
     }
 
-    // 3. หน้างานคลังสินค้า (Admin & Warehouse)
+    // 3. หน้างานคลังสินค้า (Admin, Warehouse & Staff)
     [HttpGet]
     public IActionResult Warehouse()
     {
         var role = HttpContext.Session.GetString("Role");
-        if (role != "Admin" && role != "Warehouse")
+        if (role != "Admin" && role != "Warehouse" && role != "Staff")
             return RedirectToAction("Login", "Account");
 
         ViewBag.OrdersToPack = _db.Orders
@@ -79,6 +156,9 @@ public class AdminController : Controller
             .Where(o => o.Status == "Paid" || o.Status == "Preparing")
             .OrderBy(o => o.OrderDate)
             .ToList();
+
+        var notes = PromotionHelper.LoadSystemNotes();
+        ViewBag.WarehouseIssues = notes.WarehouseIssues.OrderByDescending(i => i.ReportedAt).ToList();
 
         var products = _db.Products.Include(p => p.Category).OrderBy(p => p.StockQuantity).ToList();
         return View(products);
@@ -99,6 +179,50 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Warehouse));
     }
 
+    // 4.1 แจ้งปัญหาสินค้าชำรุด / วันหมดอายุ / สินค้าไม่เพียงพอ ให้ผู้ดูแลระบบทราบ
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult ReportWarehouseIssue(int productId, string issueType, string detail)
+    {
+        var product = _db.Products.Find(productId);
+        if (product != null && !string.IsNullOrWhiteSpace(detail))
+        {
+            var notes = PromotionHelper.LoadSystemNotes();
+            int nextId = notes.WarehouseIssues.Any() ? notes.WarehouseIssues.Max(i => i.Id) + 1 : 1;
+            notes.WarehouseIssues.Add(new WarehouseIssueNote
+            {
+                Id = nextId,
+                ProductId = productId,
+                ProductName = product.ProductName,
+                IssueType = issueType,
+                Detail = detail.Trim(),
+                ReportedBy = HttpContext.Session.GetString("Username") ?? "Warehouse",
+                ReportedAt = DateTime.Now,
+                IsResolved = false
+            });
+            PromotionHelper.SaveSystemNotes(notes);
+            TempData["Success"] = $"บันทึกแจ้งปัญหา '{issueType}' ของสินค้า '{product.ProductName}' ให้ผู้ดูแลระบบเรียบร้อยแล้ว";
+        }
+        return RedirectToAction(nameof(Warehouse));
+    }
+
+    // 4.2 ปิดงานแจ้งปัญหาคลังสินค้า
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult ResolveWarehouseIssue(int id, string? returnUrl)
+    {
+        var notes = PromotionHelper.LoadSystemNotes();
+        var issue = notes.WarehouseIssues.FirstOrDefault(i => i.Id == id);
+        if (issue != null)
+        {
+            issue.IsResolved = true;
+            PromotionHelper.SaveSystemNotes(notes);
+            TempData["Success"] = $"ดำเนินการแก้ไขรายการแจ้งปัญหา #{id} เรียบร้อยแล้ว";
+        }
+        if (!string.IsNullOrEmpty(returnUrl)) return Redirect(returnUrl);
+        return RedirectToAction(nameof(Warehouse));
+    }
+
     // 5. หน้างานพนักงานจัดส่งสินค้า (Admin & Delivery)
     [HttpGet]
     public IActionResult Delivery()
@@ -115,7 +239,48 @@ public class AdminController : Controller
             .OrderByDescending(o => o.OrderDate)
             .ToList();
 
+        var notes = PromotionHelper.LoadSystemNotes();
+        ViewBag.DeliveryNotes = notes.DeliveryNotes.ToDictionary(n => n.OrderId, n => n);
+
         return View(deliveryOrders);
+    }
+
+    // 5.1 บันทึกเลขพัสดุ / แจ้งปัญหาการจัดส่ง / อัปเดตสถานะจัดส่ง
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult SaveDeliveryTracking(
+        int orderId,
+        string? trackingNumber,
+        string? carrierName,
+        string? deliveryIssue,
+        string? newStatus)
+    {
+        var notes = PromotionHelper.LoadSystemNotes();
+        var existing = notes.DeliveryNotes.FirstOrDefault(n => n.OrderId == orderId);
+        if (existing == null)
+        {
+            existing = new DeliveryTrackingNote { OrderId = orderId };
+            notes.DeliveryNotes.Add(existing);
+        }
+
+        if (trackingNumber != null) existing.TrackingNumber = trackingNumber.Trim();
+        if (carrierName != null) existing.CarrierName = carrierName.Trim();
+        if (deliveryIssue != null) existing.DeliveryIssue = deliveryIssue.Trim();
+        existing.UpdatedAt = DateTime.Now;
+        PromotionHelper.SaveSystemNotes(notes);
+
+        if (!string.IsNullOrEmpty(newStatus))
+        {
+            var order = _db.Orders.Find(orderId);
+            if (order != null && order.Status != "Cancelled" && order.Status != "Completed")
+            {
+                order.Status = newStatus;
+                _db.SaveChanges();
+            }
+        }
+
+        TempData["Success"] = $"บันทึกข้อมูลการจัดส่งคำสั่งซื้อ #{orderId} เรียบร้อยแล้ว";
+        return RedirectToAction(nameof(Delivery));
     }
 
     // 6. อัปเดตสถานะคำสั่งซื้อกลาง (ล็อกถาวรหากเป็น Cancelled หรือ Completed)
@@ -125,11 +290,11 @@ public class AdminController : Controller
     {
         var order = _db.Orders
             .Include(o => o.Orderitems).ThenInclude(oi => oi.Product)
+            .Include(o => o.Payments)
             .FirstOrDefault(o => o.OrderId == orderId);
 
         if (order != null)
         {
-            // ป้องกันการแก้ไขหากคำสั่งซื้อถูกยกเลิกหรือจัดส่งสำเร็จแล้ว
             if (order.Status == "Cancelled" || order.Status == "Completed")
             {
                 TempData["Error"] = $"คำสั่งซื้อ #{orderId} อยู่ในสถานะ {order.Status} แล้ว ไม่สามารถเปลี่ยนแปลงสถานะได้อีก";
@@ -142,6 +307,11 @@ public class AdminController : Controller
                 {
                     if (item.Product != null) item.Product.StockQuantity += item.Quantity;
                 }
+            }
+            else if (newStatus == "Paid")
+            {
+                var payment = order.Payments.FirstOrDefault();
+                if (payment != null) payment.PaymentStatus = "Verified";
             }
 
             order.Status = newStatus;
@@ -254,14 +424,16 @@ public class AdminController : Controller
         if (HttpContext.Session.GetString("Role") != "Admin")
             return RedirectToAction("Login", "Account");
 
-        var promos = _db.Promotions.OrderByDescending(p => p.PromotionId).ToList();
+        PromotionHelper.EnsureDefaultPromotions(_db);
+
+        var promos = _db.Promotions.OrderBy(p => p.PromotionId).ToList();
         return View(promos);
     }
 
     // 9. เพิ่มโปรโมชั่นใหม่
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult CreatePromotion(Promotion promo)
+    public IActionResult CreatePromotion(Promotion promo, string? promoCode)
     {
         if (HttpContext.Session.GetString("Role") != "Admin")
             return RedirectToAction("Login", "Account");
@@ -279,7 +451,49 @@ public class AdminController : Controller
             promo.Status = true;
             _db.Promotions.Add(promo);
             _db.SaveChanges();
+            if (!string.IsNullOrWhiteSpace(promoCode))
+            {
+                PromotionHelper.SetPromoCode(promo.PromotionId, promoCode);
+            }
             TempData["Success"] = $"เพิ่มโปรโมชั่น '{promo.PromotionName}' เรียบร้อยแล้ว";
+        }
+
+        return RedirectToAction(nameof(Promotions));
+    }
+
+    // 9.1 แก้ไขเงื่อนไขโปรโมชั่น
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult EditPromotion(Promotion promo, string? promoCode)
+    {
+        if (HttpContext.Session.GetString("Role") != "Admin")
+            return RedirectToAction("Login", "Account");
+
+        var existing = _db.Promotions.Find(promo.PromotionId);
+        if (existing != null)
+        {
+            if (promo.EndDate < promo.StartDate)
+            {
+                TempData["Error"] = "วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่มต้น";
+                return RedirectToAction(nameof(Promotions));
+            }
+
+            existing.PromotionName = promo.PromotionName;
+            existing.PromotionType = promo.PromotionType;
+            existing.DiscountPercent = promo.DiscountPercent;
+            existing.DiscountAmount = promo.DiscountAmount;
+            existing.MinPurchase = promo.MinPurchase;
+            existing.MaxDiscount = promo.MaxDiscount;
+            existing.StartDate = promo.StartDate;
+            existing.EndDate = promo.EndDate;
+            _db.SaveChanges();
+
+            if (!string.IsNullOrWhiteSpace(promoCode))
+            {
+                PromotionHelper.SetPromoCode(existing.PromotionId, promoCode);
+            }
+
+            TempData["Success"] = $"แก้ไขเงื่อนไขโปรโมชั่น '{existing.PromotionName}' เรียบร้อยแล้ว";
         }
 
         return RedirectToAction(nameof(Promotions));

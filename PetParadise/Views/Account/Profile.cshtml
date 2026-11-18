@@ -1,20 +1,116 @@
 @model PetParadise.Models.User
 
 <div class="container mt-4">
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+
     <div class="row g-4">
-        <!-- ฝั่งซ้าย: ข้อมูลส่วนตัว -->
+        <!-- ฝั่งซ้าย: ข้อมูลส่วนตัว & ข้อมูลสัตว์เลี้ยง -->
         <div class="col-md-4">
-            <div class="card shadow-sm">
+            <!-- กล่องข้อมูลส่วนตัว + ฟอร์มแก้ไขข้อมูลส่วนตัว -->
+            <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0 text-white">👤 ข้อมูลส่วนตัว</h5>
+                    <h5 class="mb-0 text-white">👤 ข้อมูลส่วนตัว & แก้ไขโปรไฟล์</h5>
                 </div>
                 <div class="card-body">
-                    <p class="mb-2"><strong>ชื่อ-นามสกุล:</strong> @Model.FirstName @Model.LastName</p>
-                    <p class="mb-2"><strong>ชื่อผู้ใช้:</strong> @Model.Username</p>
-                    <p class="mb-2"><strong>อีเมล:</strong> @Model.Email</p>
-                    <p class="mb-2"><strong>เบอร์โทร:</strong> @(Model.Phone ?? "-")</p>
-                    <p class="mb-3"><strong>สถานะสมาชิก:</strong> <span class="badge bg-info text-dark">@Model.Role</span></p>
-                    <a asp-action="Logout" class="btn btn-outline-danger btn-sm w-100">ออกจากระบบ</a>
+                    <form asp-action="EditProfile" method="post">
+                        <input type="hidden" name="userId" value="@Model.UserId" />
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold mb-1">ชื่อผู้ใช้ (Username)</label>
+                            <input type="text" class="form-control form-control-sm bg-light" value="@Model.Username" readonly />
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold mb-1">ชื่อจริง</label>
+                                <input type="text" name="firstName" class="form-control form-control-sm" value="@Model.FirstName" required />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold mb-1">นามสกุล</label>
+                                <input type="text" name="lastName" class="form-control form-control-sm" value="@Model.LastName" required />
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold mb-1">อีเมล</label>
+                            <input type="email" name="email" class="form-control form-control-sm" value="@Model.Email" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold mb-1">เบอร์โทรศัพท์</label>
+                            <input type="text" name="phone" class="form-control form-control-sm" value="@Model.Phone" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold mb-1">รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)</label>
+                            <input type="password" name="newPassword" class="form-control form-control-sm" placeholder="••••••" />
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm fw-bold">บันทึกข้อมูลส่วนตัว</button>
+                            <a asp-action="Logout" class="btn btn-outline-danger btn-sm">ออกจากระบบ</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- กล่องลงทะเบียนข้อมูลสัตว์เลี้ยง (สำหรับโปรโมชั่น Birthday Pet ลด 20%) -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0 fw-bold">🐾 สัตว์เลี้ยงของฉัน (Birthday Pet)</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">
+                        ลงทะเบียนวันเกิดสัตว์เลี้ยงเพื่อรับส่วนลด <strong>20% (สูงสุด 200 บาท)</strong> ในเดือนเกิดของสัตว์เลี้ยง!
+                    </p>
+
+                    @if (Model.Pets != null && Model.Pets.Any())
+                    {
+                        foreach (var pet in Model.Pets)
+                        {
+                            bool isBirthMonth = pet.BirthDate != null && pet.BirthDate.Value.Month == DateTime.Now.Month;
+                            <div class="border rounded p-2 mb-2 bg-light d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>@pet.PetName</strong> <span class="badge bg-secondary">@pet.PetType</span>
+                                    @if (isBirthMonth)
+                                    {
+                                        <span class="badge bg-success">🎂 เดือนเกิด! รับส่วนลด 20%</span>
+                                    }
+                                    <div class="small text-muted">
+                                        วันเกิด: @(pet.BirthDate?.ToString("dd/MM/yyyy") ?? "ไม่ระบุ")
+                                    </div>
+                                </div>
+                                <form asp-action="DeletePet" method="post">
+                                    <input type="hidden" name="petId" value="@pet.PetId" />
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                                </form>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted small">ยังไม่ได้ลงทะเบียนสัตว์เลี้ยง</p>
+                    }
+
+                    <hr />
+                    <h6 class="fw-bold small mb-2">+ เพิ่มข้อมูลสัตว์เลี้ยง</h6>
+                    <form asp-action="AddPet" method="post" class="row g-2">
+                        <input type="hidden" name="userId" value="@Model.UserId" />
+                        <div class="col-7">
+                            <input type="text" name="petName" class="form-control form-control-sm" placeholder="ชื่อสัตว์เลี้ยง" required />
+                        </div>
+                        <div class="col-5">
+                            <select name="petType" class="form-select form-select-sm">
+                                <option value="สุนัข">สุนัข</option>
+                                <option value="แมว">แมว</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small text-muted mb-1">วันเดือนปีเกิดสัตว์เลี้ยง</label>
+                            <input type="date" name="birthDate" class="form-control form-control-sm" required />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-warning btn-sm w-100 fw-bold">ลงทะเบียนสัตว์เลี้ยง</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -31,15 +127,21 @@
                     {
                         foreach (var addr in Model.Addresses)
                         {
-                            <div class="border rounded p-3 mb-2 bg-light">
-                                <strong>@addr.RecipientName</strong> (โทร: @addr.Phone)
-                                @if (addr.IsDefault == true)
-                                {
-                                    <span class="badge bg-success ms-2">ค่าเริ่มต้น</span>
-                                }
-                                <p class="mb-0 text-muted small mt-1">
-                                    @addr.AddressDetail เขต/อำเภอ @addr.District จังหวัด @addr.Province @addr.PostalCode
-                                </p>
+                            <div class="border rounded p-3 mb-2 bg-light d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>@addr.RecipientName</strong> (โทร: @addr.Phone)
+                                    @if (addr.IsDefault == true)
+                                    {
+                                        <span class="badge bg-success ms-2">ค่าเริ่มต้น</span>
+                                    }
+                                    <p class="mb-0 text-muted small mt-1">
+                                        @addr.AddressDetail เขต/อำเภอ @addr.District จังหวัด @addr.Province @addr.PostalCode
+                                    </p>
+                                </div>
+                                <form asp-action="DeleteAddress" method="post">
+                                    <input type="hidden" name="addressId" value="@addr.AddressId" />
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                                </form>
                             </div>
                         }
                     }

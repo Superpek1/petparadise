@@ -13,30 +13,34 @@ public class CartController : Controller
         _db = db;
     }
 
-    private int GetCurrentUserId()
+    private int? GetCurrentUserId()
     {
-        int? userId = HttpContext.Session.GetInt32("UserId");
-        if (userId != null) return userId.Value;
+        return HttpContext.Session.GetInt32("UserId");
+    }
 
-        var firstUser = _db.Users.FirstOrDefault();
-        return firstUser?.UserId ?? 1;
+    private IActionResult RedirectToLoginWithMessage()
+    {
+        TempData["Error"] = "กรุณาเข้าสู่ระบบก่อนเลือกซื้อสินค้าหรือเพิ่มสินค้าลงตะกร้า";
+        return RedirectToAction("Login", "Account");
     }
 
     public IActionResult Index()
     {
-        int userId = GetCurrentUserId();
+        int? userId = GetCurrentUserId();
+        if (userId == null) return RedirectToLoginWithMessage();
+
         var cart = _db.Carts
             .Include(c => c.Cartitems)
             .ThenInclude(ci => ci.Product)
-            .FirstOrDefault(c => c.UserId == userId);
+            .FirstOrDefault(c => c.UserId == userId.Value);
 
         var items = cart?.Cartitems.ToList() ?? new List<Cartitem>();
 
         decimal subtotal = items.Sum(i => i.Quantity * i.Product.Price);
         decimal totalWeight = items.Sum(i => i.Quantity * i.Product.Weight);
-        decimal shippingFee = items.Any() 
-            ? (totalWeight <= 1 ? 40 : (40 + (Math.Ceiling(totalWeight - 1) * 15))) 
-            : 0;
+        decimal shippingFee = items.Any()
+            ? PromotionHelper.CalculateShippingFee(totalWeight)
+            : 0m;
 
         ViewBag.Subtotal = subtotal;
         ViewBag.TotalWeight = totalWeight;
@@ -49,14 +53,16 @@ public class CartController : Controller
     [HttpPost]
     public IActionResult AddToCart(int productId, int quantity = 1)
     {
-        int userId = GetCurrentUserId();
+        int? userId = GetCurrentUserId();
+        if (userId == null) return RedirectToLoginWithMessage();
+
         var product = _db.Products.Find(productId);
         if (product == null) return NotFound();
 
-        var cart = _db.Carts.FirstOrDefault(c => c.UserId == userId);
+        var cart = _db.Carts.FirstOrDefault(c => c.UserId == userId.Value);
         if (cart == null)
         {
-            cart = new Cart { UserId = userId, CreatedAt = DateTime.Now };
+            cart = new Cart { UserId = userId.Value, CreatedAt = DateTime.Now };
             _db.Carts.Add(cart);
             _db.SaveChanges();
         }
@@ -64,7 +70,7 @@ public class CartController : Controller
         var existingItem = _db.Cartitems.FirstOrDefault(ci => ci.CartId == cart.CartId && ci.ProductId == productId);
         if (existingItem != null)
         {
-            existingItem.Quantity += quantity;
+            existingItem.Quantity = Math.Min(product.StockQuantity, existingItem.Quantity + quantity);
             existingItem.Price = product.Price;
         }
         else
@@ -73,7 +79,7 @@ public class CartController : Controller
             {
                 CartId = cart.CartId,
                 ProductId = productId,
-                Quantity = quantity,
+                Quantity = Math.Min(product.StockQuantity, Math.Max(1, quantity)),
                 Price = product.Price
             });
         }
@@ -82,9 +88,43 @@ public class CartController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // เพิ่มหรือลดจำนวนสินค้าในตะกร้า
+    [HttpPost]
+    public IActionResult UpdateQuantity(int cartItemId, int delta)
+    {
+        if (GetCurrentUserId() == null) return RedirectToLoginWithMessage();
+
+        var item = _db.Cartitems
+            .Include(ci => ci.Product)
+            .FirstOrDefault(ci => ci.CartItemId == cartItemId);
+
+        if (item != null)
+        {
+            int newQty = item.Quantity + delta;
+            if (newQty <= 0)
+            {
+                _db.Cartitems.Remove(item);
+            }
+            else if (item.Product != null && newQty > item.Product.StockQuantity)
+            {
+                item.Quantity = item.Product.StockQuantity;
+                TempData["Error"] = $"สินค้า '{item.Product.ProductName}' มีในคลังสูงสุด {item.Product.StockQuantity} ชิ้น";
+            }
+            else
+            {
+                item.Quantity = newQty;
+            }
+            _db.SaveChanges();
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpPost]
     public IActionResult RemoveItem(int cartItemId)
     {
+        if (GetCurrentUserId() == null) return RedirectToLoginWithMessage();
+
         var item = _db.Cartitems.Find(cartItemId);
         if (item != null)
         {
@@ -97,35 +137,61 @@ public class CartController : Controller
     [HttpGet]
     public IActionResult Checkout()
     {
-        int userId = GetCurrentUserId();
+        int? userId = GetCurrentUserId();
+        if (userId == null) return RedirectToLoginWithMessage();
+
         var cart = _db.Carts
             .Include(c => c.Cartitems)
             .ThenInclude(ci => ci.Product)
-            .FirstOrDefault(c => c.UserId == userId);
+            .FirstOrDefault(c => c.UserId == userId.Value);
 
         var items = cart?.Cartitems.ToList() ?? new List<Cartitem>();
         if (!items.Any()) return RedirectToAction(nameof(Index));
 
+        PromotionHelper.EnsureDefaultPromotions(_db);
+
         var today = DateOnly.FromDateTime(DateTime.Now);
-        ViewBag.Addresses = _db.Addresses.Where(a => a.UserId == userId).ToList();
-        ViewBag.Promotions = _db.Promotions
+        var activePromos = _db.Promotions
             .Where(p => p.Status == true && p.StartDate <= today && p.EndDate >= today)
             .ToList();
+
+        var evalDict = new Dictionary<int, PromotionEvaluationResult>();
+        foreach (var p in activePromos)
+        {
+            evalDict[p.PromotionId] = PromotionHelper.EvaluatePromotion(p, items, userId.Value, _db);
+        }
+
+        ViewBag.Addresses = _db.Addresses.Where(a => a.UserId == userId.Value).ToList();
+        ViewBag.Promotions = activePromos;
+        ViewBag.PromoEvaluations = evalDict;
 
         return View(items);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult ConfirmOrder(int? selectedAddressId, int? selectedPromotionId, string recipientName, string phone, string addressDetail, IFormFile? slipFile)
+    public IActionResult ConfirmOrder(
+        int? selectedAddressId,
+        int? selectedPromotionId,
+        string? promoCode,
+        string? recipientName,
+        string? phone,
+        string? addressDetail,
+        string? paymentMethod,
+        IFormFile? slipFile)
     {
-        int userId = GetCurrentUserId();
+        int? currentUserId = GetCurrentUserId();
+        if (currentUserId == null) return RedirectToLoginWithMessage();
+        int userId = currentUserId.Value;
+
         var cart = _db.Carts
             .Include(c => c.Cartitems)
             .ThenInclude(ci => ci.Product)
             .FirstOrDefault(c => c.UserId == userId);
 
         if (cart == null || !cart.Cartitems.Any()) return RedirectToAction(nameof(Index));
+
+        var items = cart.Cartitems.ToList();
 
         int finalAddressId = 0;
         if (selectedAddressId != null && selectedAddressId > 0)
@@ -150,39 +216,46 @@ public class CartController : Controller
             finalAddressId = newAddr.AddressId;
         }
 
-        decimal subtotal = cart.Cartitems.Sum(i => i.Quantity * i.Product.Price);
-        decimal totalWeight = cart.Cartitems.Sum(i => i.Quantity * i.Product.Weight);
-        decimal shippingFee = totalWeight <= 1 ? 40 : (40 + (Math.Ceiling(totalWeight - 1) * 15));
+        decimal subtotal = items.Sum(i => i.Quantity * i.Product.Price);
+        decimal totalWeight = items.Sum(i => i.Quantity * i.Product.Weight);
+        decimal shippingFee = PromotionHelper.CalculateShippingFee(totalWeight);
 
-        decimal discount = 0;
+        decimal discount = 0m;
         int? appliedPromotionId = null;
+        bool isFreeShippingPromo = false;
+        decimal freeShippingMinAfterDiscount = 799m;
 
+        Promotion? promo = null;
         if (selectedPromotionId != null && selectedPromotionId > 0)
         {
-            var promo = _db.Promotions.Find(selectedPromotionId.Value);
-            var today = DateOnly.FromDateTime(DateTime.Now);
+            promo = _db.Promotions.Find(selectedPromotionId.Value);
+        }
+        else if (!string.IsNullOrWhiteSpace(promoCode))
+        {
+            var allPromos = _db.Promotions.Where(p => p.Status == true).ToList();
+            promo = PromotionHelper.FindPromotionByCode(promoCode, allPromos);
+        }
 
-            if (promo != null && promo.Status == true && promo.StartDate <= today && promo.EndDate >= today && subtotal >= (promo.MinPurchase ?? 0))
+        if (promo != null)
+        {
+            var eval = PromotionHelper.EvaluatePromotion(promo, items, userId, _db);
+            if (eval.IsEligible)
             {
                 appliedPromotionId = promo.PromotionId;
-                if (promo.PromotionType == "Percent")
-                {
-                    discount = Math.Round(subtotal * ((promo.DiscountPercent ?? 0) / 100m), 2);
-                    if (promo.MaxDiscount != null && promo.MaxDiscount > 0 && discount > promo.MaxDiscount.Value)
-                    {
-                        discount = promo.MaxDiscount.Value;
-                    }
-                }
-                else
-                {
-                    discount = promo.DiscountAmount ?? 0;
-                }
-
-                if (discount > subtotal) discount = subtotal;
+                discount = eval.DiscountAmount;
+                isFreeShippingPromo = eval.IsFreeShipping;
+                freeShippingMinAfterDiscount = promo.MinPurchase > 0 ? promo.MinPurchase.Value : 799m;
             }
         }
 
-        decimal afterDiscount = Math.Max(0, subtotal - discount);
+        decimal afterDiscount = Math.Max(0m, subtotal - discount);
+
+        // เงื่อนไขโปรโมชั่นที่ 4 (ส่งฟรี): ยอดสั่งซื้อหลังหักส่วนลดต้องไม่น้อยกว่า 799 บาท
+        if (isFreeShippingPromo && afterDiscount >= freeShippingMinAfterDiscount)
+        {
+            shippingFee = 0m;
+        }
+
         decimal vat = Math.Round((afterDiscount + shippingFee) * 0.07m, 2);
         decimal totalAmount = afterDiscount + shippingFee + vat;
 
@@ -223,7 +296,7 @@ public class CartController : Controller
         _db.Payments.Add(new Payment
         {
             OrderId = order.OrderId,
-            PaymentMethod = "Bank Transfer",
+            PaymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "Bank Transfer" : paymentMethod,
             PaymentAmount = totalAmount,
             PaymentDate = DateTime.Now,
             PaymentStatus = savedSlipPath != null ? "Uploaded" : "Pending",
@@ -231,7 +304,7 @@ public class CartController : Controller
         });
 
         // 3. ย้ายสินค้าจากตะกร้าลง Orderitems และตัดสต็อก
-        foreach (var item in cart.Cartitems)
+        foreach (var item in items)
         {
             _db.Orderitems.Add(new Orderitem
             {
@@ -248,7 +321,7 @@ public class CartController : Controller
         }
 
         // 4. ล้างตะกร้าสินค้า
-        _db.Cartitems.RemoveRange(cart.Cartitems);
+        _db.Cartitems.RemoveRange(items);
         _db.SaveChanges();
 
         return RedirectToAction("Tracking", "Order", new { orderId = order.OrderId });

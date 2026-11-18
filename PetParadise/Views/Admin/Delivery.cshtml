@@ -1,7 +1,11 @@
 @model IEnumerable<PetParadise.Models.Order>
+@{
+    var deliveryNotes = ViewBag.DeliveryNotes as Dictionary<int, PetParadise.Models.DeliveryTrackingNote>
+                        ?? new Dictionary<int, PetParadise.Models.DeliveryTrackingNote>();
+}
 
 <div class="container mt-4">
-    <h3 class="fw-bold mb-4">ระบบจัดการการจัดส่งสินค้า</h3>
+    <h3 class="fw-bold mb-4">🚚 ระบบจัดการการจัดส่งสินค้า (Delivery Staff)</h3>
 
     @if (TempData["Success"] != null)
     {
@@ -19,13 +23,14 @@
                                 <th>Order ID</th>
                                 <th>ข้อมูลผู้รับและที่อยู่จัดส่ง</th>
                                 <th>รายการสินค้า</th>
-                                <th>สถานะจัดส่ง</th>
-                                <th>อัปเดตสถานะจัดส่ง</th>
+                                <th>บันทึกเลขพัสดุ / แจ้งปัญหาจัดส่ง</th>
+                                <th>สถานะ & ยืนยันการส่งมอบ</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var ord in Model)
                             {
+                                var note = deliveryNotes.ContainsKey(ord.OrderId) ? deliveryNotes[ord.OrderId] : null;
                                 <tr>
                                     <td class="fw-bold">#@ord.OrderId<br /><small class="text-muted">@ord.OrderDate?.ToString("dd/MM/yy HH:mm")</small></td>
                                     <td>
@@ -41,9 +46,29 @@
                                         </ul>
                                     </td>
                                     <td>
-                                        <span class="badge @(ord.Status == "Completed" ? "bg-success" : "bg-warning text-dark")">@ord.Status</span>
+                                        <form asp-action="SaveDeliveryTracking" method="post" class="row g-1">
+                                            <input type="hidden" name="orderId" value="@ord.OrderId" />
+                                            <div class="col-7">
+                                                <input type="text" name="trackingNumber" class="form-control form-control-sm"
+                                                       placeholder="เลขพัสดุ เช่น TH123456" value="@(note?.TrackingNumber)" />
+                                            </div>
+                                            <div class="col-5">
+                                                <input type="text" name="carrierName" class="form-control form-control-sm"
+                                                       placeholder="ขนส่ง (เช่น Kerry/Flash)" value="@(note?.CarrierName)" />
+                                            </div>
+                                            <div class="col-9">
+                                                <input type="text" name="deliveryIssue" class="form-control form-control-sm"
+                                                       placeholder="แจ้งปัญหา (ถ้ามี เช่น ติดต่อผู้รับไม่ได้)" value="@(note?.DeliveryIssue)" />
+                                            </div>
+                                            <div class="col-3">
+                                                <button type="submit" class="btn btn-outline-primary btn-sm w-100">บันทึก</button>
+                                            </div>
+                                        </form>
                                     </td>
                                     <td>
+                                        <div class="mb-2">
+                                            <span class="badge @(ord.Status == "Completed" ? "bg-success" : "bg-warning text-dark")">@ord.Status</span>
+                                        </div>
                                         <form asp-action="UpdateOrderStatus" method="post" class="d-flex gap-2">
                                             <input type="hidden" name="orderId" value="@ord.OrderId" />
                                             <input type="hidden" name="returnUrl" value="/Admin/Delivery" />
@@ -57,7 +82,7 @@
                                             }
                                             else
                                             {
-                                                <span class="text-success small fw-bold">✓ จัดส่งเรียบร้อยแล้ว</span>
+                                                <span class="text-success small fw-bold">✓ ส่งมอบให้ลูกค้าเรียบร้อยแล้ว</span>
                                             }
                                         </form>
                                     </td>

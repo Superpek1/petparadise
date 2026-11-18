@@ -2,9 +2,13 @@
 @{
     var addresses = ViewBag.Addresses as List<PetParadise.Models.Address> ?? new List<PetParadise.Models.Address>();
     var promotions = ViewBag.Promotions as List<PetParadise.Models.Promotion> ?? new List<PetParadise.Models.Promotion>();
+    var promoEvals = ViewBag.PromoEvaluations as Dictionary<int, PetParadise.Models.PromotionEvaluationResult>
+                     ?? new Dictionary<int, PetParadise.Models.PromotionEvaluationResult>();
+    var systemNotes = PetParadise.Models.PromotionHelper.LoadSystemNotes();
+
     decimal subtotal = Model.Sum(i => i.Quantity * i.Product.Price);
     decimal totalWeight = Model.Sum(i => i.Quantity * i.Product.Weight);
-    decimal shippingFee = totalWeight <= 1 ? 40 : (40 + (Math.Ceiling(totalWeight - 1) * 15));
+    decimal shippingFee = PetParadise.Models.PromotionHelper.CalculateShippingFee(totalWeight);
     decimal vat = Math.Round((subtotal + shippingFee) * 0.07m, 2);
     decimal grandTotal = subtotal + shippingFee + vat;
 }
@@ -60,16 +64,28 @@
                         <h5 class="mb-0 text-white">วิธีการชำระเงิน</h5>
                     </div>
                     <div class="card-body">
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="radio" checked />
-                            <label class="form-check-label fw-bold">โอนเงินผ่านบัญชีธนาคาร (แนบสลิป)</label>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">เลือกช่องทางการชำระเงิน:</label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="payBank" value="Bank Transfer" checked />
+                                <label class="form-check-label fw-bold" for="payBank">โอนเงินผ่านบัญชีธนาคาร (แนบสลิป)</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="payPromptPay" value="PromptPay QR" />
+                                <label class="form-check-label fw-bold" for="payPromptPay">สแกนจ่าย PromptPay QR Code</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="paymentMethod" id="payCOD" value="Cash on Delivery (COD)" />
+                                <label class="form-check-label fw-bold" for="payCOD">ชำระเงินปลายทาง (COD)</label>
+                            </div>
                         </div>
                         <div class="bg-light p-3 rounded mb-3 small">
-                            <div>ธนาคารกสิกรไทย: <strong>123-4-56789-0</strong></div>
+                            <div>ธนาคารกสิกรไทย: <strong>123-4-56789-0</strong> | พร้อมเพย์: <strong>080-000-0000</strong></div>
                             <div>ชื่อบัญชี: บจก. เพ็ท พาราไดซ์</div>
                         </div>
                         <label class="form-label fw-bold">แนบหลักฐานการโอน (สลิป):</label>
                         <input type="file" name="slipFile" class="form-control" accept="image/*" />
+                        <small class="text-muted">สามารถแนบสลิปตอนนี้ หรือแจ้งชำระเงินภายหลังในหน้าติดตามคำสั่งซื้อได้</small>
                     </div>
                 </div>
             </div>
@@ -90,29 +106,69 @@
                         }
                         <hr />
 
-                        <!-- กล่องเลือกโปรโมชั่น -->
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-success">เลือกใช้โปรโมชั่น / ส่วนลด:</label>
-                            <select name="selectedPromotionId" id="promoSelect" class="form-select form-select-sm" onchange="recalculateTotal()">
-                                <option value="0" data-type="None" data-percent="0" data-amount="0" data-min="0" data-max="0">-- ไม่ใช้โปรโมชั่น --</option>
+                        <!-- ช่องกรอกโค้ดส่วนลด + กล่องเลือกโปรโมชั่น -->
+                        <div class="p-3 bg-light rounded border mb-3">
+                            <label class="form-label fw-bold text-success mb-1">🎟️ กรอกโค้ดส่วนลด / โปรโมชั่น:</label>
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="text"
+                                       name="promoCode"
+                                       id="promoCodeInput"
+                                       class="form-control text-uppercase fw-bold"
+                                       placeholder="กรอกโค้ด เช่น NEW10, SAVE150, FREESHIP..."
+                                       onkeydown="if(event.key==='Enter'){event.preventDefault();applyPromoCode();}" />
+                                <button type="button" class="btn btn-success fw-bold px-3" onclick="applyPromoCode()">ใช้โค้ด</button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="clearPromoCode()">ล้าง</button>
+                            </div>
+
+                            <!-- ปุ่มกดเลือกโค้ดด่วน -->
+                            <div class="d-flex flex-wrap gap-1 mb-2">
                                 @foreach (var p in promotions)
                                 {
-                                    bool isEligible = subtotal >= (p.MinPurchase ?? 0);
-                                    string desc = p.PromotionType == "Percent"
-                                        ? $"ลด {p.DiscountPercent?.ToString("N0")}%" + (p.MaxDiscount > 0 ? $" (สูงสุด {p.MaxDiscount?.ToString("N0")}฿)" : "")
-                                        : $"ลด {p.DiscountAmount?.ToString("N0")}฿";
+                                    string code = PetParadise.Models.PromotionHelper.GetPromoCode(p, systemNotes);
+                                    var eval = promoEvals.ContainsKey(p.PromotionId)
+                                        ? promoEvals[p.PromotionId]
+                                        : new PetParadise.Models.PromotionEvaluationResult();
+                                    <button type="button"
+                                            class="badge border-0 @(eval.IsEligible ? "bg-warning text-dark" : "bg-secondary opacity-50")"
+                                            style="cursor: pointer;"
+                                            title="@(eval.IsEligible ? p.PromotionName : eval.IneligibleReason)"
+                                            onclick="document.getElementById('promoCodeInput').value='@code'; applyPromoCode();">
+                                        @code
+                                    </button>
+                                }
+                            </div>
+
+                            <div id="promoCodeFeedback" class="small fw-semibold mb-2" style="display:none;"></div>
+
+                            <label class="form-label small fw-bold text-muted mb-1">หรือเลือกจากรายการโปรโมชั่น:</label>
+                            <select name="selectedPromotionId" id="promoSelect" class="form-select form-select-sm" onchange="onDropdownChange()">
+                                <option value="0" data-code="" data-discount="0" data-freeship="false" data-eligible="true" data-condition="">-- ไม่ใช้โปรโมชั่น --</option>
+                                @foreach (var p in promotions)
+                                {
+                                    string code = PetParadise.Models.PromotionHelper.GetPromoCode(p, systemNotes);
+                                    var eval = promoEvals.ContainsKey(p.PromotionId)
+                                        ? promoEvals[p.PromotionId]
+                                        : new PetParadise.Models.PromotionEvaluationResult();
+
+                                    string benefitLabel = eval.IsFreeShipping
+                                        ? "ส่งฟรี"
+                                        : $"ลด {eval.DiscountAmount:N2}฿";
 
                                     <option value="@p.PromotionId"
-                                            disabled="@(!isEligible)"
-                                            data-type="@p.PromotionType"
-                                            data-percent="@(p.DiscountPercent ?? 0)"
-                                            data-amount="@(p.DiscountAmount ?? 0)"
-                                            data-min="@(p.MinPurchase ?? 0)"
-                                            data-max="@(p.MaxDiscount ?? 0)">
-                                        @p.PromotionName (@desc) @(isEligible ? "" : $"[ขั้นต่ำ {p.MinPurchase?.ToString("N0")}฿]")
+                                            disabled="@(!eval.IsEligible)"
+                                            data-code="@code"
+                                            data-altcode="PROMO@(p.PromotionId)"
+                                            data-name="@p.PromotionName"
+                                            data-eligible="@(eval.IsEligible ? "true" : "false")"
+                                            data-reason="@eval.IneligibleReason"
+                                            data-discount="@eval.DiscountAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                            data-freeship="@(eval.IsFreeShipping ? "true" : "false")"
+                                            data-condition="@eval.ConditionText">
+                                        [@code] @p.PromotionName @(eval.IsEligible ? $"({benefitLabel})" : $"[ไม่เข้าเงื่อนไข: {eval.IneligibleReason}]")
                                     </option>
                                 }
                             </select>
+                            <small id="promoConditionHint" class="text-muted d-block mt-1"></small>
                         </div>
 
                         <div class="d-flex justify-content-between text-muted mb-1">
@@ -124,8 +180,8 @@
                             <span id="discountText">-0.00 ฿</span>
                         </div>
                         <div class="d-flex justify-content-between text-muted mb-1">
-                            <span>ค่าจัดส่ง (น้ำหนัก @totalWeight.ToString("N2") kg):</span>
-                            <span>@shippingFee.ToString("N2") ฿</span>
+                            <span>ค่าจัดส่ง (น้ำหนักรวม @totalWeight.ToString("N2") kg):</span>
+                            <span id="shippingText">@shippingFee.ToString("N2") ฿</span>
                         </div>
                         <div class="d-flex justify-content-between text-muted mb-3">
                             <span>ภาษีมูลค่าเพิ่ม (VAT 7%):</span>
@@ -157,22 +213,98 @@
         form.style.display = (val == "0") ? "block" : "none";
     }
 
+    function showFeedback(message, isSuccess) {
+        var fb = document.getElementById("promoCodeFeedback");
+        if (!message) {
+            fb.style.display = "none";
+            fb.innerText = "";
+            return;
+        }
+        fb.style.display = "block";
+        fb.className = "small fw-semibold mb-2 " + (isSuccess ? "text-success" : "text-danger");
+        fb.innerText = message;
+    }
+
+    function applyPromoCode() {
+        var input = document.getElementById("promoCodeInput");
+        var rawCode = (input.value || "").trim().replace(/^#/, "").toUpperCase();
+        var select = document.getElementById("promoSelect");
+
+        if (!rawCode) {
+            select.value = "0";
+            showFeedback("กรุณากรอกโค้ดส่วนลด", false);
+            recalculateTotal();
+            return;
+        }
+
+        var matchedOpt = null;
+        for (var i = 1; i < select.options.length; i++) {
+            var opt = select.options[i];
+            var code = (opt.getAttribute("data-code") || "").toUpperCase();
+            var altCode = (opt.getAttribute("data-altcode") || "").toUpperCase();
+            var promoId = opt.value;
+
+            if (rawCode === code || rawCode === altCode || rawCode === promoId) {
+                matchedOpt = opt;
+                break;
+            }
+        }
+
+        if (!matchedOpt) {
+            select.value = "0";
+            showFeedback("❌ ไม่พบโค้ดโปรโมชั่น '" + rawCode + "' ในระบบ", false);
+            recalculateTotal();
+            return;
+        }
+
+        var isEligible = matchedOpt.getAttribute("data-eligible") === "true";
+        var promoName = matchedOpt.getAttribute("data-name") || rawCode;
+        var reason = matchedOpt.getAttribute("data-reason") || "ไม่ตรงตามเงื่อนไข";
+
+        if (!isEligible) {
+            select.value = "0";
+            showFeedback("⚠️ โค้ด '" + rawCode + "' (" + promoName + ") ไม่สามารถใช้ได้: " + reason, false);
+            recalculateTotal();
+            return;
+        }
+
+        select.value = matchedOpt.value;
+        input.value = matchedOpt.getAttribute("data-code");
+        showFeedback("✅ ใช้โค้ด '" + input.value + "' (" + promoName + ") สำเร็จ!", true);
+        recalculateTotal();
+    }
+
+    function clearPromoCode() {
+        document.getElementById("promoCodeInput").value = "";
+        document.getElementById("promoSelect").value = "0";
+        showFeedback("", true);
+        recalculateTotal();
+    }
+
+    function onDropdownChange() {
+        var select = document.getElementById("promoSelect");
+        var opt = select.options[select.selectedIndex];
+        var code = opt.getAttribute("data-code") || "";
+        var name = opt.getAttribute("data-name") || "";
+        document.getElementById("promoCodeInput").value = code;
+
+        if (code) {
+            showFeedback("✅ เลือกใช้โค้ด '" + code + "' (" + name + ") สำเร็จ!", true);
+        } else {
+            showFeedback("", true);
+        }
+        recalculateTotal();
+    }
+
     function recalculateTotal() {
         var select = document.getElementById("promoSelect");
         var opt = select.options[select.selectedIndex];
 
-        var type = opt.getAttribute("data-type");
-        var percent = parseFloat(opt.getAttribute("data-percent")) || 0;
-        var amount = parseFloat(opt.getAttribute("data-amount")) || 0;
-        var maxDisc = parseFloat(opt.getAttribute("data-max")) || 0;
+        var discount = parseFloat(opt.getAttribute("data-discount")) || 0;
+        var isFreeShip = opt.getAttribute("data-freeship") === "true";
+        var conditionText = opt.getAttribute("data-condition") || "";
 
-        var discount = 0;
-        if (type === "Percent") {
-            discount = Math.round((baseSubtotal * (percent / 100)) * 100) / 100;
-            if (maxDisc > 0 && discount > maxDisc) discount = maxDisc;
-        } else if (type === "Fixed") {
-            discount = amount;
-        }
+        document.getElementById("promoConditionHint").innerText = conditionText;
 
         if (discount > baseSubtotal) discount = baseSubtotal;
 
@@ -185,8 +317,16 @@
         }
 
         var afterDiscount = Math.max(0, baseSubtotal - discount);
-        var vat = Math.round(((afterDiscount + baseShipping) * 0.07) * 100) / 100;
-        var grandTotal = afterDiscount + baseShipping + vat;
+        var currentShipping = (isFreeShip && afterDiscount >= 799) ? 0 : baseShipping;
+
+        if (currentShipping === 0 && baseShipping > 0) {
+            document.getElementById("shippingText").innerHTML = '<span class="text-success fw-bold">0.00 ฿ (ส่งฟรี!)</span>';
+        } else {
+            document.getElementById("shippingText").innerText = currentShipping.toFixed(2) + " ฿";
+        }
+
+        var vat = Math.round(((afterDiscount + currentShipping) * 0.07) * 100) / 100;
+        var grandTotal = afterDiscount + currentShipping + vat;
 
         document.getElementById("vatText").innerText = vat.toFixed(2) + " ฿";
         document.getElementById("grandTotalText").innerText = grandTotal.toFixed(2) + " ฿";
