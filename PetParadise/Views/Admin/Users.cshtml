@@ -1,0 +1,119 @@
+@model IEnumerable<PetParadise.Models.User>
+@{
+    string[] allRoles = { "Customer", "Staff", "Warehouse", "Delivery", "Admin" };
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">จัดการผู้ใช้งานและสิทธิ์</h3>
+        <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <!-- ตัวกรองตาม Role -->
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+        <a asp-action="Users" class="btn btn-sm @(ViewBag.RoleFilter == null ? "btn-dark" : "btn-outline-dark")">ทั้งหมด</a>
+        @foreach (var r in allRoles)
+        {
+            <a asp-action="Users" asp-route-roleFilter="@r" class="btn btn-sm @(ViewBag.RoleFilter == r ? "btn-primary" : "btn-outline-primary")">@r</a>
+        }
+    </div>
+
+    <!-- ฟอร์มเพิ่มผู้ใช้งานใหม่ -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0 text-white">+ เพิ่มบัญชีพนักงาน / สมาชิกใหม่</h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="CreateUser" method="post" class="row g-2">
+                <div class="col-md-2">
+                    <input type="text" name="Username" class="form-control form-control-sm" placeholder="Username" required />
+                </div>
+                <div class="col-md-2">
+                    <input type="password" name="Password" class="form-control form-control-sm" placeholder="Password" required />
+                </div>
+                <div class="col-md-2">
+                    <input type="text" name="FirstName" class="form-control form-control-sm" placeholder="ชื่อจริง" required />
+                </div>
+                <div class="col-md-2">
+                    <input type="text" name="LastName" class="form-control form-control-sm" placeholder="นามสกุล" required />
+                </div>
+                <div class="col-md-2">
+                    <input type="email" name="Email" class="form-control form-control-sm" placeholder="อีเมล" required />
+                </div>
+                <div class="col-md-2 d-flex gap-1">
+                    <select name="Role" class="form-select form-select-sm">
+                        <option value="Customer">Customer (ลูกค้า)</option>
+                        <option value="Staff">Staff (พนักงาน)</option>
+                        <option value="Warehouse">Warehouse (คลังสินค้า)</option>
+                        <option value="Delivery">Delivery (จัดส่งสินค้า)</option>
+                        <option value="Admin">Admin (ผู้ดูแลระบบ)</option>
+                    </select>
+                    <button type="submit" class="btn btn-success btn-sm fw-bold">เพิ่ม</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ตารางรายชื่อผู้ใช้ทั้งหมด -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>ชื่อผู้ใช้</th>
+                            <th>ชื่อ-นามสกุล</th>
+                            <th>อีเมล / เบอร์โทร</th>
+                            <th>สิทธิ์ปัจจุบัน</th>
+                            <th>เปลี่ยนตำแหน่ง (Role)</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in Model)
+                        {
+                            <tr>
+                                <td>@u.UserId</td>
+                                <td class="fw-bold">@u.Username</td>
+                                <td>@u.FirstName @u.LastName</td>
+                                <td>@u.Email<br /><small class="text-muted">@(u.Phone ?? "-")</small></td>
+                                <td>
+                                    <span class="badge @(u.Role == "Admin" ? "bg-danger" : u.Role == "Customer" ? "bg-secondary" : "bg-primary")">@u.Role</span>
+                                </td>
+                                <td>
+                                    <form asp-action="UpdateUserRole" method="post" class="d-flex gap-1">
+                                        <input type="hidden" name="userId" value="@u.UserId" />
+                                        <select name="newRole" class="form-select form-select-sm" style="width: 150px;">
+                                            <option value="Customer" selected="@(u.Role == "Customer")">Customer (ลูกค้า)</option>
+                                            <option value="Staff" selected="@(u.Role == "Staff")">Staff (พนักงาน)</option>
+                                            <option value="Warehouse" selected="@(u.Role == "Warehouse")">Warehouse (คลังสินค้า)</option>
+                                            <option value="Delivery" selected="@(u.Role == "Delivery")">Delivery (จัดส่ง)</option>
+                                            <option value="Admin" selected="@(u.Role == "Admin")">Admin (ผู้ดูแลระบบ)</option>
+                                        </select>
+                                        <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <form asp-action="DeleteUser" method="post" onsubmit="return confirm('ยืนยันการลบผู้ใช้ @u.Username ?');">
+                                        <input type="hidden" name="userId" value="@u.UserId" />
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

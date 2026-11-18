@@ -1,0 +1,115 @@
+@model IEnumerable<PetParadise.Models.Order>
+@{
+    var lowStock = ViewBag.LowStockProducts as List<PetParadise.Models.Product> ?? new List<PetParadise.Models.Product>();
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">แดชบอร์ดผู้ดูแลระบบ (Admin Dashboard)</h3>
+        <div class="d-flex gap-2">
+            <a asp-action="Orders" class="btn btn-primary">จัดการคำสั่งซื้อทั้งหมด</a>
+            <a asp-controller="AdminProduct" asp-action="Index" class="btn btn-dark">🛍️ จัดการสินค้า</a>
+        </div>
+    </div>
+
+    <!-- การ์ดสรุปตัวเลข 4 ช่อง -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-success border-4">
+                <div class="card-body">
+                    <small class="text-muted fw-bold">ยอดขายรวม (ไม่รวมยกเลิก)</small>
+                    <h4 class="fw-bold text-success mt-1 mb-0">@(((decimal)ViewBag.TotalSales).ToString("N2")) ฿</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-primary border-4">
+                <div class="card-body">
+                    <small class="text-muted fw-bold">คำสั่งซื้อทั้งหมด</small>
+                    <h4 class="fw-bold text-primary mt-1 mb-0">@ViewBag.TotalOrders รายการ</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-warning border-4">
+                <div class="card-body">
+                    <small class="text-muted fw-bold">รอดำเนินการ (Pending)</small>
+                    <h4 class="fw-bold text-warning mt-1 mb-0">@ViewBag.PendingOrders รายการ</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-start border-info border-4">
+                <div class="card-body">
+                    <small class="text-muted fw-bold">สมาชิกทั้งหมด</small>
+                    <h4 class="fw-bold text-info mt-1 mb-0">@ViewBag.TotalCustomers คน</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- ตารางออเดอร์ล่าสุด -->
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0 text-white">คำสั่งซื้อล่าสุด 5 รายการ</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>เลขที่</th>
+                                <th>ลูกค้า</th>
+                                <th>วันที่</th>
+                                <th>ยอดสุทธิ</th>
+                                <th>สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var o in Model)
+                            {
+                                <tr>
+                                    <td>#@o.OrderId</td>
+                                    <td>@o.User.FirstName @o.User.LastName</td>
+                                    <td>@o.OrderDate?.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td class="fw-bold">@o.TotalAmount.ToString("N2") ฿</td>
+                                    <td>
+                                        <span class="badge @(o.Status == "Cancelled" ? "bg-danger" : "bg-info text-dark")">@o.Status</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- สินค้าใกล้หมดสต็อก -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0 text-white">สินค้าใกล้หมดสต็อก (≤ 5 ชิ้น)</h5>
+                </div>
+                <div class="card-body">
+                    @if (lowStock.Any())
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var p in lowStock)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span>@p.ProductName</span>
+                                    <span class="badge bg-danger">เหลือ @p.StockQuantity</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">สต็อกสินค้าทุกรายการอยู่ในเกณฑ์ปกติ</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

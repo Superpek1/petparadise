@@ -1,0 +1,117 @@
+@model IEnumerable<PetParadise.Models.Product>
+@{
+    var categories = ViewBag.Categories as List<PetParadise.Models.Category> ?? new List<PetParadise.Models.Category>();
+    int? selectedCat = ViewBag.SelectedCategory;
+    string? keyword = ViewBag.SearchKeyword;
+}
+
+<div class="container">
+    <div class="row g-4">
+        <!-- แถบหมวดหมู่สินค้าด้านซ้าย (เรียงลงมาเป็นปุ่มบล็อกแยกกันชัดเจน) -->
+        <div class="col-lg-3">
+            <div class="card">
+                <div class="category-box-header" style="background-color: #0d9488; color: #ffffff; font-weight: 600; padding: 0.85rem 1.15rem;">
+                    หมวดหมู่สินค้า
+                </div>
+                <div class="p-3 d-grid gap-2">
+                    <a asp-action="Index"
+                       class="btn d-flex justify-content-between align-items-center text-start px-3 py-2 rounded-3 text-decoration-none @(selectedCat == null || selectedCat == 0 ? "fw-bold" : "")"
+                       style="@(selectedCat == null || selectedCat == 0 ? "background-color: #ccfbf1; border: 1.5px solid #0d9488; color: #0f766e;" : "background-color: #f8fafc; border: 1px solid #e2e8f0; color: #334155;")">
+                        <span>สินค้าทั้งหมด</span>
+                        <span>&rsaquo;</span>
+                    </a>
+                    @foreach (var cat in categories)
+                    {
+                        bool isActive = (selectedCat == cat.CategoryId);
+                        <a asp-action="Index" asp-route-categoryId="@cat.CategoryId" asp-route-search="@keyword"
+                           class="btn d-flex justify-content-between align-items-center text-start px-3 py-2 rounded-3 text-decoration-none @(isActive ? "fw-bold" : "")"
+                           style="@(isActive ? "background-color: #ccfbf1; border: 1.5px solid #0d9488; color: #0f766e;" : "background-color: #f8fafc; border: 1px solid #e2e8f0; color: #334155;")">
+                            <span>@cat.CategoryName</span>
+                            <span>&rsaquo;</span>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- พื้นที่แสดงรายการสินค้าด้านขวา -->
+        <div class="col-lg-9">
+            <!-- ช่องค้นหามีกรอบชัดเจน -->
+            <form asp-action="Index" method="get" class="mb-4">
+                @if (selectedCat != null)
+                {
+                    <input type="hidden" name="categoryId" value="@selectedCat" />
+                }
+                <div class="card p-2">
+                    <div class="input-group">
+                        <input type="text" name="search" value="@keyword" class="form-control border-0 bg-transparent shadow-none ps-3" placeholder="ค้นหาอาหารสัตว์, ของเล่น, อุปกรณ์..." />
+                        <button type="submit" class="btn btn-pp-primary px-4 rounded-3">ค้นหา</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- ตารางการ์ดสินค้า -->
+            @if (Model != null && Model.Any())
+            {
+                <div class="row row-cols-1 row-cols-md-3 g-4">
+                    @foreach (var item in Model)
+                    {
+                        var imgUrl = item.Productimages.FirstOrDefault()?.ImageUrl;
+                        <div class="col">
+                            <div class="card h-100 product-card">
+                                <!-- กล่องรูปภาพสินค้า -->
+                                <div class="product-img-box">
+                                    @if (!string.IsNullOrEmpty(imgUrl))
+                                    {
+                                        <img src="@imgUrl" alt="@item.ProductName" />
+                                    }
+                                    else
+                                    {
+                                        <div class="text-center text-muted">
+                                            <div class="fs-1 opacity-50">🐾</div>
+                                            <small class="opacity-75">ไม่มีรูปภาพ</small>
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- ข้อมูลสินค้า -->
+                                <div class="card-body d-flex flex-column p-3">
+                                    <div class="mb-2">
+                                        <span class="badge rounded-pill border" style="background-color: #f0fdfa; color: #0f766e; border-color: #99f6e4 !important; font-weight: 500;">
+                                            @item.Category?.CategoryName
+                                        </span>
+                                    </div>
+
+                                    <h6 class="fw-semibold text-dark mb-1 text-truncate" title="@item.ProductName">
+                                        @item.ProductName
+                                    </h6>
+
+                                    <div class="mt-auto pt-2">
+                                        <div class="fs-5 fw-bold mb-3" style="color: #0d9488;">
+                                            @item.Price.ToString("N2") <small class="fs-6 fw-normal text-muted">฿</small>
+                                        </div>
+
+                                        <a asp-action="Detail" asp-route-id="@item.ProductId" class="btn btn-pp-outline w-100">
+                                            ดูรายละเอียด
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="card p-5 text-center">
+                    <div class="fs-1 mb-2">🔍</div>
+                    <h5 class="text-muted">ไม่พบสินค้าที่ค้นหา</h5>
+                    <p class="text-muted small mb-3">ลองเปลี่ยนคำค้นหาหรือเลือกดูสินค้าทั้งหมด</p>
+                    <div>
+                        <a asp-action="Index" class="btn btn-pp-primary btn-sm px-4">ดูสินค้าทั้งหมด</a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

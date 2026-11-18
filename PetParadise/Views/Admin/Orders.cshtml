@@ -1,0 +1,107 @@
+@model IEnumerable<PetParadise.Models.Order>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">จัดการคำสั่งซื้อลูกค้า</h3>
+        <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <!-- ตัวกรองสถานะ -->
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+        <a asp-action="Orders" class="btn btn-sm @(ViewBag.StatusFilter == null ? "btn-dark" : "btn-outline-dark")">ทั้งหมด</a>
+        <a asp-action="Orders" asp-route-statusFilter="Pending" class="btn btn-sm @(ViewBag.StatusFilter == "Pending" ? "btn-warning" : "btn-outline-warning")">Pending</a>
+        <a asp-action="Orders" asp-route-statusFilter="Paid" class="btn btn-sm @(ViewBag.StatusFilter == "Paid" ? "btn-info" : "btn-outline-info")">Paid</a>
+        <a asp-action="Orders" asp-route-statusFilter="Preparing" class="btn btn-sm @(ViewBag.StatusFilter == "Preparing" ? "btn-primary" : "btn-outline-primary")">Preparing</a>
+        <a asp-action="Orders" asp-route-statusFilter="Shipped" class="btn btn-sm @(ViewBag.StatusFilter == "Shipped" ? "btn-secondary" : "btn-outline-secondary")">Shipped</a>
+        <a asp-action="Orders" asp-route-statusFilter="Completed" class="btn btn-sm @(ViewBag.StatusFilter == "Completed" ? "btn-success" : "btn-outline-success")">Completed</a>
+        <a asp-action="Orders" asp-route-statusFilter="Cancelled" class="btn btn-sm @(ViewBag.StatusFilter == "Cancelled" ? "btn-danger" : "btn-outline-danger")">Cancelled</a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Order ID</th>
+                            <th>ลูกค้า / ที่อยู่จัดส่ง</th>
+                            <th>รายการสินค้า</th>
+                            <th>ยอดสุทธิ / สลิป</th>
+                            <th>สถานะปัจจุบัน</th>
+                            <th>เปลี่ยนสถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var ord in Model)
+                        {
+                            var payment = ord.Payments.FirstOrDefault();
+                            <tr>
+                                <td class="fw-bold">#@ord.OrderId<br /><small class="text-muted">@ord.OrderDate?.ToString("dd/MM/yy HH:mm")</small></td>
+                                <td>
+                                    <strong>@ord.Address.RecipientName</strong> (@ord.Address.Phone)<br />
+                                    <small class="text-muted">@ord.Address.AddressDetail @ord.Address.District @ord.Address.Province @ord.Address.PostalCode</small>
+                                </td>
+                                <td>
+                                    <ul class="mb-0 ps-3 small">
+                                        @foreach (var item in ord.Orderitems)
+                                        {
+                                            <li>@item.Product.ProductName (x@(item.Quantity))</li>
+                                        }
+                                    </ul>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-danger">@ord.TotalAmount.ToString("N2") ฿</div>
+                                    @if (payment != null && !string.IsNullOrEmpty(payment.PaymentSlip))
+                                    {
+                                        <a href="@payment.PaymentSlip" target="_blank" class="btn btn-outline-info btn-sm mt-1">ดูสลิป</a>
+                                    }
+                                    else
+                                    {
+                                        <small class="text-muted">ไม่มีสลิปแนบ</small>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge @(ord.Status == "Cancelled" ? "bg-danger" : ord.Status == "Completed" ? "bg-success" : "bg-info text-dark")">@ord.Status</span>
+                                </td>
+                                <td>
+                                    @if (ord.Status == "Cancelled")
+                                    {
+                                        <span class="text-danger small fw-bold">ยกเลิกแล้ว</span>
+                                    }
+                                    else if (ord.Status == "Completed")
+                                    {
+                                        <span class="text-success small fw-bold">จัดส่งสำเร็จ</span>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="UpdateOrderStatus" method="post" class="d-flex gap-1">
+                                            <input type="hidden" name="orderId" value="@ord.OrderId" />
+                                            <select name="newStatus" class="form-select form-select-sm" style="width: 145px;">
+                                                <option value="Pending" selected="@(ord.Status == "Pending")">Pending</option>
+                                                <option value="Paid" selected="@(ord.Status == "Paid")">Paid (ชำระแล้ว)</option>
+                                                <option value="Preparing" selected="@(ord.Status == "Preparing")">Preparing (เตรียมส่ง)</option>
+                                                <option value="Shipped" selected="@(ord.Status == "Shipped")">Shipped (จัดส่งแล้ว)</option>
+                                                <option value="Completed" selected="@(ord.Status == "Completed")">Completed (สำเร็จ)</option>
+                                                <option value="Cancelled" selected="@(ord.Status == "Cancelled")">Cancelled (ยกเลิก)</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

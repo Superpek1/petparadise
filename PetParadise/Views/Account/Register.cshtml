@@ -1,0 +1,48 @@
+@model PetParadise.Models.User
+
+<div class="container mt-4" style="max-width: 600px;">
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white py-3">
+            <h4 class="mb-0 fw-bold text-white">สมัครสมาชิกใหม่</h4>
+        </div>
+        <div class="card-body p-4">
+            @if (ViewBag.Error != null)
+            {
+                <div class="alert alert-danger">@ViewBag.Error</div>
+            }
+
+            <form asp-action="Register" method="post">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">ชื่อจริง</label>
+                        <input asp-for="FirstName" class="form-control" required />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">นามสกุล</label>
+                        <input asp-for="LastName" class="form-control" required />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">ชื่อผู้ใช้ (Username)</label>
+                    <input asp-for="Username" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">อีเมล</label>
+                    <input asp-for="Email" type="email" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">เบอร์โทรศัพท์</label>
+                    <input asp-for="Phone" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">รหัสผ่าน</label>
+                    <input asp-for="Password" type="password" class="form-control" required />
+                </div>
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-success fw-bold">ยืนยันการสมัครสมาชิก</button>
+                    <a asp-action="Login" class="btn btn-outline-secondary">กลับไปหน้าเข้าสู่ระบบ</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,194 @@
+@model IEnumerable<PetParadise.Models.Cartitem>
+@{
+    var addresses = ViewBag.Addresses as List<PetParadise.Models.Address> ?? new List<PetParadise.Models.Address>();
+    var promotions = ViewBag.Promotions as List<PetParadise.Models.Promotion> ?? new List<PetParadise.Models.Promotion>();
+    decimal subtotal = Model.Sum(i => i.Quantity * i.Product.Price);
+    decimal totalWeight = Model.Sum(i => i.Quantity * i.Product.Weight);
+    decimal shippingFee = totalWeight <= 1 ? 40 : (40 + (Math.Ceiling(totalWeight - 1) * 15));
+    decimal vat = Math.Round((subtotal + shippingFee) * 0.07m, 2);
+    decimal grandTotal = subtotal + shippingFee + vat;
+}
+
+<div class="container mt-4">
+    <h3 class="fw-bold mb-4">ยืนยันคำสั่งซื้อและการชำระเงิน</h3>
+
+    <form asp-action="ConfirmOrder" method="post" enctype="multipart/form-data">
+        <div class="row g-4">
+            <!-- ฝั่งซ้าย: ข้อมูลผู้รับและที่อยู่ -->
+            <div class="col-md-7">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0 text-white">ข้อมูลผู้รับและสถานที่จัดส่ง</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (addresses.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-primary">เลือกจากที่อยู่ที่บันทึกไว้:</label>
+                                <select name="selectedAddressId" id="addressSelect" class="form-select" onchange="toggleNewAddress(this.value)">
+                                    @foreach (var addr in addresses)
+                                    {
+                                        <option value="@addr.AddressId">
+                                            @addr.RecipientName (@addr.Phone) - @addr.AddressDetail @addr.District @addr.Province @addr.PostalCode
+                                        </option>
+                                    }
+                                    <option value="0">+ กรอกที่อยู่จัดส่งใหม่...</option>
+                                </select>
+                            </div>
+                        }
+
+                        <div id="newAddressForm" style="display: @(addresses.Any() ? "none" : "block");">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">ชื่อ-นามสกุล ผู้รับ</label>
+                                <input type="text" name="recipientName" class="form-control" placeholder="ชื่อ นามสกุล" @(addresses.Any() ? "" : "required") />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">เบอร์โทรศัพท์</label>
+                                <input type="text" name="phone" class="form-control" placeholder="08x-xxx-xxxx" @(addresses.Any() ? "" : "required") />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">ที่อยู่สำหรับจัดส่ง</label>
+                                <textarea name="addressDetail" class="form-control" rows="3" placeholder="บ้านเลขที่ ซอย ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์" @(addresses.Any() ? "" : "required")></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- วิธีการชำระเงิน -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0 text-white">วิธีการชำระเงิน</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" checked />
+                            <label class="form-check-label fw-bold">โอนเงินผ่านบัญชีธนาคาร (แนบสลิป)</label>
+                        </div>
+                        <div class="bg-light p-3 rounded mb-3 small">
+                            <div>ธนาคารกสิกรไทย: <strong>123-4-56789-0</strong></div>
+                            <div>ชื่อบัญชี: บจก. เพ็ท พาราไดซ์</div>
+                        </div>
+                        <label class="form-label fw-bold">แนบหลักฐานการโอน (สลิป):</label>
+                        <input type="file" name="slipFile" class="form-control" accept="image/*" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- ฝั่งขวา: โปรโมชั่นและสรุปยอดคำสั่งซื้อ -->
+            <div class="col-md-5">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0 text-white">สรุปยอดคำสั่งซื้อ</h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var item in Model)
+                        {
+                            <div class="d-flex justify-content-between mb-2">
+                                <span>@item.Product.ProductName (x@(item.Quantity))</span>
+                                <span>@((item.Quantity * item.Product.Price).ToString("N2")) ฿</span>
+                            </div>
+                        }
+                        <hr />
+
+                        <!-- กล่องเลือกโปรโมชั่น -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-success">เลือกใช้โปรโมชั่น / ส่วนลด:</label>
+                            <select name="selectedPromotionId" id="promoSelect" class="form-select form-select-sm" onchange="recalculateTotal()">
+                                <option value="0" data-type="None" data-percent="0" data-amount="0" data-min="0" data-max="0">-- ไม่ใช้โปรโมชั่น --</option>
+                                @foreach (var p in promotions)
+                                {
+                                    bool isEligible = subtotal >= (p.MinPurchase ?? 0);
+                                    string desc = p.PromotionType == "Percent"
+                                        ? $"ลด {p.DiscountPercent?.ToString("N0")}%" + (p.MaxDiscount > 0 ? $" (สูงสุด {p.MaxDiscount?.ToString("N0")}฿)" : "")
+                                        : $"ลด {p.DiscountAmount?.ToString("N0")}฿";
+
+                                    <option value="@p.PromotionId"
+                                            disabled="@(!isEligible)"
+                                            data-type="@p.PromotionType"
+                                            data-percent="@(p.DiscountPercent ?? 0)"
+                                            data-amount="@(p.DiscountAmount ?? 0)"
+                                            data-min="@(p.MinPurchase ?? 0)"
+                                            data-max="@(p.MaxDiscount ?? 0)">
+                                        @p.PromotionName (@desc) @(isEligible ? "" : $"[ขั้นต่ำ {p.MinPurchase?.ToString("N0")}฿]")
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="d-flex justify-content-between text-muted mb-1">
+                            <span>ราคาสินค้ารวม:</span>
+                            <span>@subtotal.ToString("N2") ฿</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-success mb-1" id="discountRow" style="display:none !important;">
+                            <span>ส่วนลดโปรโมชั่น:</span>
+                            <span id="discountText">-0.00 ฿</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted mb-1">
+                            <span>ค่าจัดส่ง (น้ำหนัก @totalWeight.ToString("N2") kg):</span>
+                            <span>@shippingFee.ToString("N2") ฿</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted mb-3">
+                            <span>ภาษีมูลค่าเพิ่ม (VAT 7%):</span>
+                            <span id="vatText">@vat.ToString("N2") ฿</span>
+                        </div>
+                        <hr />
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="fw-bold mb-0">ยอดสุทธิทั้งหมด:</h5>
+                            <h4 class="fw-bold text-danger mb-0" id="grandTotalText">@grandTotal.ToString("N2") ฿</h4>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg fw-bold">ยืนยันการสั่งซื้อ</button>
+                            <a asp-action="Index" class="btn btn-outline-secondary">กลับไปแก้ไขตะกร้า</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    const baseSubtotal = @subtotal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    const baseShipping = @shippingFee.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    function toggleNewAddress(val) {
+        var form = document.getElementById("newAddressForm");
+        form.style.display = (val == "0") ? "block" : "none";
+    }
+
+    function recalculateTotal() {
+        var select = document.getElementById("promoSelect");
+        var opt = select.options[select.selectedIndex];
+
+        var type = opt.getAttribute("data-type");
+        var percent = parseFloat(opt.getAttribute("data-percent")) || 0;
+        var amount = parseFloat(opt.getAttribute("data-amount")) || 0;
+        var maxDisc = parseFloat(opt.getAttribute("data-max")) || 0;
+
+        var discount = 0;
+        if (type === "Percent") {
+            discount = Math.round((baseSubtotal * (percent / 100)) * 100) / 100;
+            if (maxDisc > 0 && discount > maxDisc) discount = maxDisc;
+        } else if (type === "Fixed") {
+            discount = amount;
+        }
+
+        if (discount > baseSubtotal) discount = baseSubtotal;
+
+        var discountRow = document.getElementById("discountRow");
+        if (discount > 0) {
+            discountRow.style.setProperty("display", "flex", "important");
+            document.getElementById("discountText").innerText = "-" + discount.toFixed(2) + " ฿";
+        } else {
+            discountRow.style.setProperty("display", "none", "important");
+        }
+
+        var afterDiscount = Math.max(0, baseSubtotal - discount);
+        var vat = Math.round(((afterDiscount + baseShipping) * 0.07) * 100) / 100;
+        var grandTotal = afterDiscount + baseShipping + vat;
+
+        document.getElementById("vatText").innerText = vat.toFixed(2) + " ฿";
+        document.getElementById("grandTotalText").innerText = grandTotal.toFixed(2) + " ฿";
+    }
+</script>

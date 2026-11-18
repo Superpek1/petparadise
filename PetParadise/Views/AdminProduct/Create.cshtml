@@ -1,0 +1,121 @@
+@model PetParadise.Models.Product
+
+<div class="container mt-4">
+    <!-- ส่วนจัดการหมวดหมู่สินค้า (เพิ่ม / ลบ หมวดหมู่ได้ทันที) -->
+    <div class="card mb-4 border-info">
+        <div class="card-header bg-info text-dark fw-bold d-flex justify-content-between align-items-center">
+            <span>จัดการหมวดหมู่สินค้า (เพิ่ม / ลบ หมวดหมู่)</span>
+        </div>
+        <div class="card-body">
+            <!-- ฟอร์มเพิ่มหมวดหมู่ใหม่ -->
+            <form asp-action="AddCategory" method="post" class="row g-2 align-items-center mb-3">
+                <div class="col-md-5">
+                    <input type="text" name="categoryName" class="form-control" placeholder="ชื่อหมวดหมู่ใหม่" required />
+                </div>
+                <div class="col-md-5">
+                    <input type="text" name="description" class="form-control" placeholder="คำอธิบายหมวดหมู่" />
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-primary">+ เพิ่มหมวดหมู่</button>
+                </div>
+            </form>
+
+            <!-- ตารางแสดงหมวดหมู่ที่มีอยู่พร้อมปุ่มลบ -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm table-striped align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 80px;" class="text-center">ID</th>
+                            <th>ชื่อหมวดหมู่</th>
+                            <th>คำอธิบาย</th>
+                            <th style="width: 100px;" class="text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (ViewBag.CategoryList != null && ((List<PetParadise.Models.Category>)ViewBag.CategoryList).Any())
+                        {
+                            foreach (var cat in (List<PetParadise.Models.Category>)ViewBag.CategoryList)
+                            {
+                                <tr>
+                                    <td class="text-center">@cat.CategoryId</td>
+                                    <td class="fw-bold">@cat.CategoryName</td>
+                                    <td class="text-muted">@cat.Description</td>
+                                    <td class="text-center">
+                                        <form asp-action="DeleteCategory" asp-route-id="@cat.CategoryId" method="post" class="d-inline"
+                                              onsubmit="return confirm('ต้องการลบหมวดหมู่ @cat.CategoryName ใช่หรือไม่? (หากมีสินค้าผูกอยู่จะไม่สามารถลบได้)');">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">ยังไม่มีหมวดหมู่สินค้าในระบบ กรุณาเพิ่มด้านบน</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- เพิ่มสินค้าใหม่ -->
+    <div class="card border-dark shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <div asp-validation-summary="All" class="text-danger mb-3"></div>
+            <h4 class="mb-0">เพิ่มสินค้าใหม่</h4>
+        </div>
+        <div class="card-body">
+            <form asp-action="Create" method="post">
+                <div class="mb-3">
+                    <label asp-for="ProductName" class="form-label fw-bold">ชื่อสินค้า</label>
+                    <input asp-for="ProductName" class="form-control" placeholder="อาหารเพิ่มพลังหมาแมว++" required />
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="CategoryId" class="form-label fw-bold">หมวดหมู่สินค้า</label>
+                    <select asp-for="CategoryId" class="form-select" asp-items="ViewBag.Categories" required>
+                        <option value="">-- เลือกหมวดหมู่ --</option>
+                    </select>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Price" class="form-label fw-bold">ราคา (บาท)</label>
+                        <input asp-for="Price" type="number" step="0.01" min="0" class="form-control" placeholder="0.00" required />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Weight" class="form-label fw-bold">น้ำหนัก (kg)</label>
+                        <input asp-for="Weight" type="number" step="0.01" min="0" class="form-control" placeholder="เช่น 1.50" required />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="StockQuantity" class="form-label fw-bold">จำนวนสต็อก</label>
+                        <input asp-for="StockQuantity" type="number" min="0" class="form-control" value="10" required />
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="Status" class="form-label fw-bold">สถานะ</label>
+                        <select asp-for="Status" class="form-select">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label fw-bold">รายละเอียดสินค้า</label>
+                    <textarea asp-for="Description" class="form-control" rows="3" placeholder="ระบุรายละเอียด ส่วนผสม หรือคุณสมบัติสินค้า"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">URL รูปภาพ</label>
+                    <input name="ImageUrl" class="form-control" placeholder="เช่น https://placehold.co/400x300?text=Purina" />
+                </div>
+
+                <button type="submit" class="btn btn-success px-4">บันทึกสินค้า</button>
+                <a asp-action="Index" class="btn btn-secondary ms-2">ย้อนกลับ</a>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,93 @@
+@model IEnumerable<PetParadise.Models.Cartitem>
+
+<div class="container mt-4">
+    <h3 class="fw-bold mb-4">🛒 ตะกร้าสินค้าของคุณ</h3>
+
+    @if (Model != null && Model.Any())
+    {
+        <div class="row g-4">
+            <!-- ตารางรายการสินค้า -->
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>สินค้า</th>
+                                        <th class="text-center">ราคาต่อชิ้น</th>
+                                        <th class="text-center">จำนวน</th>
+                                        <th class="text-end">รวม</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong>@item.Product.ProductName</strong>
+                                                <small class="text-muted d-block">น้ำหนัก: @item.Product.Weight.ToString("N2") kg/ชิ้น</small>
+                                            </td>
+                                            <td class="text-center">@item.Product.Price.ToString("N2") ฿</td>
+                                            <td class="text-center">@item.Quantity</td>
+                                            <td class="text-end fw-bold">@((item.Quantity * item.Product.Price).ToString("N2")) ฿</td>
+                                            <td class="text-end">
+                                                <form asp-action="RemoveItem" method="post">
+                                                    <input type="hidden" name="cartItemId" value="@item.CartItemId" />
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กล่องสรุปยอด -->
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0 text-white">สรุปยอดในตะกร้า</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">ราคาสินค้ารวม:</span>
+                            <span class="fw-bold">@(((decimal)(ViewBag.Subtotal ?? 0)).ToString("N2")) ฿</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">น้ำหนักรวมทั้งหมด:</span>
+                            <span>@(((decimal)(ViewBag.TotalWeight ?? 0)).ToString("N2")) kg</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted">ค่าจัดส่งโดยประมาณ:</span>
+                            <span>@(((decimal)(ViewBag.ShippingFee ?? 0)).ToString("N2")) ฿</span>
+                        </div>
+                        <hr />
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h6 class="fw-bold mb-0">ยอดรวมเบื้องต้น:</h6>
+                            <h5 class="fw-bold text-primary mb-0">@(((decimal)(ViewBag.GrandTotal ?? 0)).ToString("N2")) ฿</h5>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <a asp-action="Checkout" class="btn btn-success fw-bold">ไปหน้าชำระเงิน</a>
+                            <a asp-controller="Product" asp-action="Index" class="btn btn-outline-secondary">เลือกซื้อสินค้าต่อ</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm p-5 text-center">
+            <h5 class="text-muted mb-3">ยังไม่มีสินค้าในตะกร้าของคุณ</h5>
+            <div>
+                <a asp-controller="Product" asp-action="Index" class="btn btn-primary">ไปเลือกซื้อสินค้าเลย</a>
+            </div>
+        </div>
+    }
+</div>

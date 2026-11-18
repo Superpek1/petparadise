@@ -1,0 +1,38 @@
+@model IEnumerable<PetParadise.Models.Labstudent>
+    
+@{ViewData["Title"] = "Lab 9_1 - รายการนักศึกษา";}
+<h2>รายการ</h2>
+@if (ViewBag.Status != null)
+{<p class="text-danger fw-bold">@ViewBag.Status</p>}
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Password</th>
+            <th>Name</th>
+            <th>Last Name</th>
+            <th></th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.StdId</td>
+                <td>@item.StdPassword</td>
+                <td>@item.StdName</td>
+                <td>@item.StdLastname</td>
+                <td>
+                    <a asp-action="Lab10" asp-route-StdId="@item.StdId" class="btn btn-primary">Edit</a>
+                </td>
+                <td>
+                    <form asp-action="Lab10_1" asp-route-StdId="@item.StdId" method="post"
+                          onsubmit="return confirm('Are you sure you want to delete this student?');">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

@@ -1,0 +1,57 @@
+@model IEnumerable<PetParadise.Models.Promotion>
+
+<div class="container mt-4 p-4 bg-white text-dark rounded shadow-sm">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-dark">🎁 โปรโมชั่นและส่วนลดพิเศษ</h2>
+        <p class="text-secondary">เลือกรับโค้ดส่วนลดสุดคุ้มสำหรับสัตว์เลี้ยงที่คุณรัก</p>
+    </div>
+
+    <div class="row g-4">
+        @if (Model != null && Model.Any())
+        {
+            foreach (var promo in Model)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 border-warning shadow-sm">
+                        <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between align-items-center">
+                            <span>รหัส: #@promo.PromotionId</span>
+                            <span class="badge bg-danger">
+                                @if (promo.DiscountPercent != null && promo.DiscountPercent > 0)
+                                {
+                                    <span>ลด @promo.DiscountPercent?.ToString("N0")%</span>
+                                }
+                                else if (promo.DiscountAmount != null && promo.DiscountAmount > 0)
+                                {
+                                    <span>ลด @promo.DiscountAmount?.ToString("N2") ฿</span>
+                                }
+                            </span>
+                        </div>
+                        <div class="card-body bg-light text-dark">
+                            <h5 class="card-title fw-bold text-dark">@promo.PromotionName</h5>
+                            <span class="badge bg-secondary mb-2">ประเภท: @promo.PromotionType</span>
+                            <ul class="list-unstyled small text-muted mt-2">
+                                <li><strong>ยอดซื้อขั้นต่ำ:</strong> @(promo.MinPurchase?.ToString("N2") ?? "0.00") บาท</li>
+                                @if (promo.MaxDiscount != null)
+                                {
+                                    <li><strong>ลดสูงสุด:</strong> @promo.MaxDiscount?.ToString("N2") บาท</li>
+                                }
+                                <li><strong>ระยะเวลา:</strong> @promo.StartDate.ToString("dd/MM/yyyy") - @promo.EndDate.ToString("dd/MM/yyyy")</li>
+                            </ul>
+                        </div>
+                        <div class="card-footer bg-white border-0 text-center pb-3">
+                            <button type="button" class="btn btn-outline-warning text-dark w-100 fw-bold" onclick="alert('โปรโมชั่น: @promo.PromotionName นำไปใช้ในหน้าชำระเงินได้ทันที');">
+                                ใช้โปรโมชั่นนี้
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="col-12 text-center text-muted py-5">
+                <h4>ยังไม่มีโปรโมชั่นที่เปิดใช้งานในขณะนี้</h4>
+            </div>
+        }
+    </div>
+</div>

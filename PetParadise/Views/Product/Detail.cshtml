@@ -1,0 +1,144 @@
+@model PetParadise.Models.Product
+
+@{
+    var mainImg = Model.Productimages.FirstOrDefault()?.ImageUrl ?? "https://placehold.co/500x350?text=Pet+Paradise";
+    bool canReview = ViewBag.CanReview ?? false;
+    double avgRating = Model.Reviews.Any() ? Model.Reviews.Average(r => r.Rating) : 0;
+}
+
+<div class="container mt-4">
+    <a asp-action="Index" class="btn btn-outline-secondary btn-sm mb-3">&larr; กลับหน้ารายการสินค้า</a>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <div class="row g-4 mb-5">
+        <!-- รูปภาพสินค้า -->
+        <div class="col-md-6 text-center">
+            <div class="card shadow-sm p-2">
+                <img src="@mainImg" class="img-fluid rounded" alt="@Model.ProductName" style="max-height: 400px; object-fit: contain;">
+            </div>
+        </div>
+
+        <!-- รายละเอียดและการสั่งซื้อ -->
+        <div class="col-md-6">
+            <span class="badge bg-secondary mb-2">@Model.Category?.CategoryName</span>
+            <h2 class="fw-bold">@Model.ProductName</h2>
+
+            <!-- คะแนนรีวิวเฉลี่ย -->
+            <div class="mb-2 text-warning fw-bold">
+                @if (Model.Reviews.Any())
+                {
+                    <span>⭐ @avgRating.ToString("0.0") / 5.0</span>
+                    <span class="text-muted small fw-normal">(@Model.Reviews.Count รีวิว)</span>
+                }
+                else
+                {
+                    <span class="text-muted small fw-normal">ยังไม่มีคะแนนรีวิว</span>
+                }
+            </div>
+            <hr />
+
+            <h3 class="text-danger fw-bold mb-3">@Model.Price.ToString("N2") บาท</h3>
+
+            <div class="mb-3">
+                <p class="mb-1"><strong>น้ำหนัก:</strong> @Model.Weight.ToString("N2") กิโลกรัม</p>
+                <p class="mb-1"><strong>สถานะสต็อก:</strong> 
+                    @if (Model.StockQuantity > 0)
+                    {
+                        <span class="text-success fw-bold">มีสินค้า (@Model.StockQuantity ชิ้น)</span>
+                    }
+                    else
+                    {
+                        <span class="text-danger fw-bold">สินค้าหมด</span>
+                    }
+                </p>
+            </div>
+
+            <div class="card bg-light p-3 mb-4">
+                <h6 class="fw-bold">รายละเอียดสินค้า:</h6>
+                <p class="card-text text-muted mb-0">@(string.IsNullOrEmpty(Model.Description) ? "ไม่มีรายละเอียดเพิ่มเติม" : Model.Description)</p>
+            </div>
+
+            <!-- ฟอร์มระบุจำนวนเตรียมส่งไปตะกร้า -->
+            <form asp-controller="Cart" asp-action="AddToCart" method="post">
+                <input type="hidden" name="productId" value="@Model.ProductId" />
+                <div class="row align-items-center mb-3">
+                    <div class="col-auto">
+                        <label class="col-form-label fw-bold">จำนวน:</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="number" name="quantity" class="form-control text-center" value="1" min="1" max="@Model.StockQuantity" style="width: 100px;" @(Model.StockQuantity <= 0 ? "disabled" : "") />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg flex-grow-1" @(Model.StockQuantity <= 0 ? "disabled" : "")>
+                        เพิ่มลงตะกร้า
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ส่วนรีวิวสินค้า -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0 text-white">รีวิวจากผู้ซื้อสินค้า (@Model.Reviews.Count)</h5>
+        </div>
+        <div class="card-body">
+            @if (canReview)
+            {
+                <form asp-action="AddReview" method="post" class="bg-light p-3 rounded border mb-4">
+                    <input type="hidden" name="productId" value="@Model.ProductId" />
+                    <h6 class="fw-bold mb-2">เขียนรีวิวสินค้านี้</h6>
+                    <div class="row g-2 align-items-center mb-2">
+                        <div class="col-auto">
+                            <label class="form-label fw-bold mb-0 small">ให้คะแนน:</label>
+                        </div>
+                        <div class="col-auto">
+                            <select name="rating" class="form-select form-select-sm">
+                                <option value="5">⭐⭐⭐⭐⭐</option>
+                                <option value="4">⭐⭐⭐⭐</option>
+                                <option value="3">⭐⭐⭐</option>
+                                <option value="2">⭐⭐</option>
+                                <option value="1">⭐</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <textarea name="comment" class="form-control form-control-sm" rows="2" placeholder="บอกเล่าความประทับใจเกี่ยวกับสินค้านี้..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-sm fw-bold">ส่งรีวิว</button>
+                </form>
+            }
+
+            @if (Model.Reviews.Any())
+            {
+                foreach (var rev in Model.Reviews.OrderByDescending(r => r.CreatedAt))
+                {
+                    <div class="border-bottom pb-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>@(rev.User?.FirstName ?? "ลูกค้า") @(rev.User?.LastName ?? "")</strong>
+                                <span class="text-warning ms-2">@(new string('⭐', rev.Rating))</span>
+                            </div>
+                            <small class="text-muted">@rev.CreatedAt?.ToString("dd/MM/yyyy HH:mm")</small>
+                        </div>
+                        <p class="mb-0 mt-1 text-muted">@(string.IsNullOrEmpty(rev.Comment) ? "-" : rev.Comment)</p>
+                    </div>
+                }
+            }
+            else
+            {
+                <p class="text-muted mb-0 text-center py-3">ยังไม่มีรีวิวสำหรับสินค้านี้</p>
+            }
+        </div>
+    </div>
+</div>

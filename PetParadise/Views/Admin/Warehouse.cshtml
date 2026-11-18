@@ -1,0 +1,127 @@
+@model IEnumerable<PetParadise.Models.Product>
+@{
+    var ordersToPack = ViewBag.OrdersToPack as List<PetParadise.Models.Order> ?? new List<PetParadise.Models.Order>();
+}
+
+<div class="container mt-4">
+    <h3 class="fw-bold mb-4">ระบบจัดการคลังสินค้าและการแพ็กของ</h3>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+
+    <!-- ส่วนที่ 1: รายการออเดอร์ที่รอจัดเตรียมและแพ็กสินค้า -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0 text-white">รายการสั่งซื้อที่ต้องจัดเตรียมและแพ็กสินค้า</h5>
+        </div>
+        <div class="card-body">
+            @if (ordersToPack.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Order ID</th>
+                                <th>รายการสินค้าที่ต้องจัด</th>
+                                <th>สถานะ</th>
+                                <th>อัปเดตงานคลัง</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ord in ordersToPack)
+                            {
+                                <tr>
+                                    <td class="fw-bold">#@ord.OrderId<br /><small class="text-muted">@ord.OrderDate?.ToString("dd/MM/yy HH:mm")</small></td>
+                                    <td>
+                                        <ul class="mb-0 ps-3">
+                                            @foreach (var item in ord.Orderitems)
+                                            {
+                                                <li><strong>@item.Product.ProductName</strong> — จำนวน <span class="text-danger fw-bold">@item.Quantity</span> ชิ้น</li>
+                                            }
+                                        </ul>
+                                    </td>
+                                    <td><span class="badge bg-info text-dark">@ord.Status</span></td>
+                                    <td>
+                                        <form asp-action="UpdateOrderStatus" method="post" class="d-flex gap-2">
+                                            <input type="hidden" name="orderId" value="@ord.OrderId" />
+                                            <input type="hidden" name="returnUrl" value="/Admin/Warehouse" />
+                                            @if (ord.Status == "Paid")
+                                            {
+                                                <button type="submit" name="newStatus" value="Preparing" class="btn btn-warning btn-sm fw-bold">เริ่มแพ็กสินค้า (Preparing)</button>
+                                            }
+                                            else if (ord.Status == "Preparing")
+                                            {
+                                                <button type="submit" name="newStatus" value="Shipped" class="btn btn-success btn-sm fw-bold">แพ็กเสร็จ/ส่งมอบให้ขนส่ง (Shipped)</button>
+                                            }
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted mb-0">ไม่มีคำสั่งซื้อที่รอแพ็กสินค้าในขณะนี้</p>
+            }
+        </div>
+    </div>
+
+    <!-- ส่วนที่ 2: ตรวจสอบสต็อกสินค้าและบันทึกสินค้าเข้า-ออกคลัง -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0 text-white">ตรวจสอบจำนวนคงเหลือและบันทึกสินค้าเข้า-ออกคลัง</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>รหัส</th>
+                            <th>ชื่อสินค้า</th>
+                            <th>หมวดหมู่</th>
+                            <th>คงเหลือในคลัง</th>
+                            <th>แจ้งเตือน</th>
+                            <th>รับเข้า (+) / ตัดออก (-)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Model)
+                        {
+                            <tr>
+                                <td>#@p.ProductId</td>
+                                <td class="fw-bold">@p.ProductName</td>
+                                <td>@p.Category.CategoryName</td>
+                                <td class="fw-bold fs-5 @(p.StockQuantity <= 5 ? "text-danger" : "text-success")">@p.StockQuantity</td>
+                                <td>
+                                    @if (p.StockQuantity == 0)
+                                    {
+                                        <span class="badge bg-danger">สินค้าหมด!</span>
+                                    }
+                                    else if (p.StockQuantity <= 5)
+                                    {
+                                        <span class="badge bg-warning text-dark">ใกล้หมดสต็อก</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">ปกติ</span>
+                                    }
+                                </td>
+                                <td>
+                                    <form asp-action="UpdateStock" method="post" class="d-flex gap-1">
+                                        <input type="hidden" name="productId" value="@p.ProductId" />
+                                        <input type="number" name="addQuantity" class="form-control form-control-sm" style="width: 90px;" placeholder="+/- จำนวน" required />
+                                        <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,26 @@
+@model PetParadise.Models.Labstudent
+
+@{ViewData["Title"] = "Lab 10 - Edit Student";}
+<h2>แก้ไขข้อมูล</h2>
+<form asp-action="Lab10_Update" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="form-group mb-3">
+        <label>ID</label>
+        <input asp-for="StdId" class="form-control" readonly />
+    </div>
+    <div class="form-group mb-3">
+        <label>Password</label>
+        <input asp-for="StdPassword" class="form-control" type="password" />
+    </div>
+    <div class="form-group mb-3">
+        <label>Name</label>
+        <input asp-for="StdName" class="form-control" />
+    </div>
+    <div class="form-group mb-3">
+        <label>Last Name</label>
+        <input asp-for="StdLastname" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-success">บันทึกการแก้ไข</button>
+    <a asp-action="Lab9_1" class="btn btn-secondary">ยกเลิก</a>
+</form>

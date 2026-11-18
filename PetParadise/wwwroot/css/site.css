@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --pp-primary: #0d9488;
+    --pp-primary-hover: #0f766e;
+    --pp-accent: #f59e0b;
+    --pp-bg: #eef2f6;
+    --pp-text: #1e293b;
+    --pp-border: #cbd5e1;
+}
+
+body {
+    font-family: 'Prompt', sans-serif !important;
+    background-color: var(--pp-bg) !important;
+    color: var(--pp-text) !important;
+}
+
+/* Navbar มีขอบล่างชัดเจน */
+.navbar-modern {
+    background-color: #ffffff !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+}
+
+.nav-link-modern {
+    font-weight: 500;
+    color: #475569 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 999px;
+    transition: all 0.2s ease;
+}
+
+.nav-link-modern:hover {
+    color: var(--pp-primary) !important;
+    background-color: #f0fdfa;
+}
+
+/* Card ทุกใบมีกรอบชัดเจน แยกออกจากพื้นหลัง */
+.card {
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05) !important;
+    background-color: #ffffff !important;
+    overflow: hidden;
+}
+
+.card-header {
+    border-bottom: 1.5px solid #e2e8f0 !important;
+    padding: 0.9rem 1.25rem !important;
+}
+
+/* การ์ดสินค้าแบบมีกรอบและเส้นแบ่งส่วนชัดเจน */
+.product-card {
+    border: 1.5px solid #cbd5e1 !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--pp-primary) !important;
+    box-shadow: 0 10px 24px rgba(13, 148, 136, 0.15) !important;
+}
+
+.product-img-box {
+    height: 200px;
+    background-color: #f8fafc;
+    border-bottom: 1.5px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
+}
+
+.product-img-box img {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+.product-card:hover .product-img-box img {
+    transform: scale(1.05);
+}
+
+/* ปุ่มโทนสีหลัก (Teal) */
+.btn-pp-primary {
+    background-color: var(--pp-primary);
+    border: 1.5px solid var(--pp-primary);
+    color: #ffffff;
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-pp-primary:hover {
+    background-color: var(--pp-primary-hover);
+    border-color: var(--pp-primary-hover);
+    color: #ffffff;
+}
+
+.btn-pp-outline {
+    border: 1.5px solid #94a3b8;
+    color: #1e293b;
+    background-color: #ffffff;
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-pp-outline:hover {
+    border-color: var(--pp-primary);
+    color: #ffffff;
+    background-color: var(--pp-primary);
+}
+
+/* แถบหมวดหมู่ด้านซ้ายแบบมีกรอบแยกแต่ละรายการชัดเจน */
+.category-box-header {
+    background-color: var(--pp-primary);
+    color: #ffffff;
+    font-weight: 600;
+    padding: 0.85rem 1.15rem;
+    font-size: 1rem;
+}

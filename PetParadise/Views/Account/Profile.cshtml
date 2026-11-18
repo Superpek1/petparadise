@@ -1,0 +1,125 @@
+@model PetParadise.Models.User
+
+<div class="container mt-4">
+    <div class="row g-4">
+        <!-- ฝั่งซ้าย: ข้อมูลส่วนตัว -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0 text-white">👤 ข้อมูลส่วนตัว</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>ชื่อ-นามสกุล:</strong> @Model.FirstName @Model.LastName</p>
+                    <p class="mb-2"><strong>ชื่อผู้ใช้:</strong> @Model.Username</p>
+                    <p class="mb-2"><strong>อีเมล:</strong> @Model.Email</p>
+                    <p class="mb-2"><strong>เบอร์โทร:</strong> @(Model.Phone ?? "-")</p>
+                    <p class="mb-3"><strong>สถานะสมาชิก:</strong> <span class="badge bg-info text-dark">@Model.Role</span></p>
+                    <a asp-action="Logout" class="btn btn-outline-danger btn-sm w-100">ออกจากระบบ</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ฝั่งขวา: ที่อยู่จัดส่ง & ประวัติคำสั่งซื้อ -->
+        <div class="col-md-8">
+            <!-- กล่องที่อยู่จัดส่ง -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-white">📍 ที่อยู่จัดส่งของฉัน</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.Addresses.Any())
+                    {
+                        foreach (var addr in Model.Addresses)
+                        {
+                            <div class="border rounded p-3 mb-2 bg-light">
+                                <strong>@addr.RecipientName</strong> (โทร: @addr.Phone)
+                                @if (addr.IsDefault == true)
+                                {
+                                    <span class="badge bg-success ms-2">ค่าเริ่มต้น</span>
+                                }
+                                <p class="mb-0 text-muted small mt-1">
+                                    @addr.AddressDetail เขต/อำเภอ @addr.District จังหวัด @addr.Province @addr.PostalCode
+                                </p>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted">ยังไม่มีข้อมูลที่อยู่จัดส่ง</p>
+                    }
+
+                    <hr />
+                    <!-- ฟอร์มเพิ่มที่อยู่ใหม่ -->
+                    <h6 class="fw-bold mb-3">+ เพิ่มที่อยู่จัดส่งใหม่</h6>
+                    <form asp-action="AddAddress" method="post" class="row g-2">
+                        <input type="hidden" name="UserId" value="@Model.UserId" />
+                        <div class="col-md-6">
+                            <input type="text" name="RecipientName" class="form-control form-control-sm" placeholder="ชื่อผู้รับ" required />
+                        </div>
+                        <div class="col-md-6">
+                            <input type="text" name="Phone" class="form-control form-control-sm" placeholder="เบอร์โทรศัพท์" required />
+                        </div>
+                        <div class="col-12">
+                            <input type="text" name="AddressDetail" class="form-control form-control-sm" placeholder="บ้านเลขที่ ซอย ถนน แขวง/ตำบล" required />
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" name="District" class="form-control form-control-sm" placeholder="เขต/อำเภอ" required />
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" name="Province" class="form-control form-control-sm" placeholder="จังหวัด" required />
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" name="PostalCode" class="form-control form-control-sm" placeholder="รหัสไปรษณีย์" required />
+                        </div>
+                        <div class="col-12 mt-2">
+                            <button type="submit" class="btn btn-primary btn-sm">บันทึกที่อยู่</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- กล่องประวัติคำสั่งซื้อ -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0 text-white">ประวัติคำสั่งซื้อ</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.Orders.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>เลขที่</th>
+                                        <th>วันที่สั่งซื้อ</th>
+                                        <th>ยอดสุทธิ</th>
+                                        <th>สถานะ</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var ord in Model.Orders.OrderByDescending(o => o.OrderDate))
+                                    {
+                                        <tr>
+                                            <td>#@ord.OrderId</td>
+                                            <td>@ord.OrderDate?.ToString("dd/MM/yyyy")</td>
+                                            <td class="fw-bold text-danger">@ord.TotalAmount.ToString("N2") ฿</td>
+                                            <td><span class="badge bg-info text-dark">@ord.Status</span></td>
+                                            <td>
+                                                <a asp-controller="Order" asp-action="Tracking" asp-route-orderId="@ord.OrderId" class="btn btn-outline-primary btn-sm">ติดตาม</a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">ยังไม่มีประวัติการสั่งซื้อ</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

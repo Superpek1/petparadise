@@ -1,0 +1,118 @@
+﻿@using Microsoft.AspNetCore.Http
+@{
+    var currentRole = Context.Session.GetString("Role");
+    var currentUsername = Context.Session.GetString("Username");
+}
+<!DOCTYPE html>
+<html lang="th" data-bs-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - PetParadise</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css?v=2" />
+    <link rel="stylesheet" href="~/PetParadise.styles.css" asp-append-version="true" />
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-light navbar-modern sticky-top mb-4">
+            <div class="container">
+                <a class="navbar-brand fw-bold fs-4 d-flex align-items-center gap-2" style="color: #0d9488;" asp-controller="Product" asp-action="Index">
+                    <span>🐾 PetParadise</span>
+                    @if (!string.IsNullOrEmpty(currentRole) && currentRole != "Customer")
+                    {
+                        <span class="badge rounded-pill bg-dark fs-6 fw-normal">@currentRole</span>
+                    }
+                </a>
+                <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between">
+                    <ul class="navbar-nav mx-auto gap-1">
+                        @if (currentRole == "Admin")
+                        {
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Dashboard">แดชบอร์ด</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Orders">คำสั่งซื้อ</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Warehouse">คลังสินค้า</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Delivery">จัดส่ง</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="AdminProduct" asp-action="Index">สินค้า</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Promotions">โปรโมชั่น</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Users">ผู้ใช้งาน</a></li>
+                        }
+                        else if (currentRole == "Staff")
+                        {
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Orders">ตรวจสอบออเดอร์</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Product" asp-action="Index">ดูสินค้าหน้าร้าน</a></li>
+                        }
+                        else if (currentRole == "Warehouse")
+                        {
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Warehouse">คลังสินค้าและแพ็กพัสดุ</a></li>
+                        }
+                        else if (currentRole == "Delivery")
+                        {
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Admin" asp-action="Delivery">รายการจัดส่งสินค้า</a></li>
+                        }
+                        else
+                        {
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Product" asp-action="Index">หน้าร้านค้า</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Promotion" asp-action="Index">โปรโมชั่น</a></li>
+                            <li class="nav-item"><a class="nav-link nav-link-modern" asp-controller="Order" asp-action="Tracking">ติดตามคำสั่งซื้อ</a></li>
+                        }
+                    </ul>
+
+                    <ul class="navbar-nav gap-2 align-items-center mt-2 mt-lg-0">
+                        @if (!string.IsNullOrEmpty(currentRole) && currentRole != "Customer")
+                        {
+                            <li class="nav-item">
+                                <span class="text-muted small fw-medium me-2">สวัสดี, @currentUsername</span>
+                            </li>
+                            <li class="nav-item">
+                                <a class="btn btn-outline-danger btn-sm rounded-pill px-3" asp-controller="Account" asp-action="Logout">ออกจากระบบ</a>
+                            </li>
+                        }
+                        else if (!string.IsNullOrEmpty(currentUsername))
+                        {
+                            <li class="nav-item">
+                                <a class="btn btn-pp-outline btn-sm rounded-pill px-3" asp-controller="Account" asp-action="Profile">@currentUsername</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="btn btn-pp-primary btn-sm rounded-pill px-3" asp-controller="Cart" asp-action="Index">ตะกร้า</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="btn btn-link text-danger text-decoration-none btn-sm" asp-controller="Account" asp-action="Logout">ออก</a>
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+                                <a class="btn btn-pp-outline btn-sm rounded-pill px-3" asp-controller="Cart" asp-action="Index">🛒 ตะกร้า</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="btn btn-pp-primary btn-sm rounded-pill px-4" asp-controller="Account" asp-action="Login">เข้าสู่ระบบ</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container flex-grow-1">
+        <main role="main" class="pb-4">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="bg-white border-top py-4 mt-auto">
+        <div class="container text-center text-muted small">
+            &copy; 2569 <strong>PetParadise</strong> — ร้านจำหน่ายอาหารและอุปกรณ์สำหรับสัตว์เลี้ยงที่คุณรัก
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,113 @@
+@model PetParadise.Models.Order
+
+<div class="container mt-4">
+    <h3 class="fw-bold mb-4">ตรวจสอบและติดตามสถานะคำสั่งซื้อ</h3>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <!-- กล่องค้นหาด้วยเลขคำสั่งซื้อ -->
+    <div class="card shadow-sm p-3 mb-4">
+        <form asp-action="Tracking" method="get" class="row g-2 align-items-center">
+            <div class="col-md-9">
+                <input type="number" name="orderId" class="form-control" placeholder="กรอกหมายเลขคำสั่งซื้อ (Order ID)..." value="@(Model?.OrderId)" required />
+            </div>
+            <div class="col-md-3 d-grid">
+                <button type="submit" class="btn btn-primary">ค้นหาสถานะ</button>
+            </div>
+        </form>
+    </div>
+
+    @if (Model != null)
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <span>คำสั่งซื้อเลขที่: #@Model.OrderId</span>
+                <span>วันที่: @Model.OrderDate?.ToString("dd/MM/yyyy HH:mm")</span>
+            </div>
+            <div class="card-body">
+                <!-- แถบสถานะแบบ Progress Step -->
+                <div class="mb-4">
+                    <h6 class="fw-bold">สถานะปัจจุบัน: 
+                        @if (Model.Status == "Cancelled")
+                        {
+                            <span class="badge bg-danger fs-6">Cancelled (ยกเลิกแล้ว)</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-info text-dark fs-6">@Model.Status</span>
+                        }
+                    </h6>
+
+                    @if (Model.Status != "Cancelled")
+                    {
+                        <div class="progress mt-2" style="height: 10px;">
+                            @{
+                                int progress = 25;
+                                if (Model.Status == "Paid") progress = 50;
+                                else if (Model.Status == "Preparing") progress = 75;
+                                else if (Model.Status == "Shipped" || Model.Status == "Completed") progress = 100;
+                            }
+                            <div class="progress-bar bg-success" role="progressbar" style="width: @progress%;"></div>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted small mt-2">
+                            <span>รอชำระเงิน</span>
+                            <span>ชำระเงินแล้ว</span>
+                            <span>กำลังเตรียมสินค้า</span>
+                            <span>จัดส่งเรียบร้อย</span>
+                        </div>
+                    }
+                </div>
+
+                <hr />
+
+                <!-- รายการสินค้าในออเดอร์ -->
+                <h6 class="fw-bold mb-3">รายการสินค้า</h6>
+                <ul class="list-group list-group-flush mb-3">
+                    @foreach (var item in Model.Orderitems)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <strong>@(item.Product?.ProductName ?? "สินค้าในคำสั่งซื้อ")</strong>
+                                <small class="text-muted d-block">จำนวน: @item.Quantity ชิ้น x @item.UnitPrice.ToString("N2") ฿</small>
+                            </div>
+                            <span class="fw-bold">@((item.Quantity * item.UnitPrice).ToString("N2")) ฿</span>
+                        </li>
+                    }
+                </ul>
+
+                <!-- ยอดเงินรวม -->
+                <div class="text-end">
+                    <p class="mb-1 text-muted">ยอดรวมสินค้า: @Model.Subtotal.ToString("N2") ฿</p>
+                    @if (Model.Discount != null && Model.Discount > 0)
+                    {
+                        <p class="mb-1 text-success">ส่วนลด: -@Model.Discount?.ToString("N2") ฿</p>
+                    }
+                    <p class="mb-1 text-muted">ค่าจัดส่ง: @((Model.ShippingFee ?? 0).ToString("N2")) ฿</p>
+                    <p class="mb-1 text-muted">ภาษีมูลค่าเพิ่ม (VAT 7%): @((Model.Vat ?? 0).ToString("N2")) ฿</p>
+                    <h4 class="fw-bold text-danger">ยอดรวมทั้งสิ้น: @Model.TotalAmount.ToString("N2") บาท</h4>
+                </div>
+
+                <!-- ปุ่มยกเลิกคำสั่งซื้อ (แสดงเฉพาะสถานะที่ยังไม่ส่ง) -->
+                @if (Model.Status == "Pending" || Model.Status == "Paid" || Model.Status == "Preparing")
+                {
+                    <hr />
+                    <div class="d-flex justify-content-end">
+                        <form asp-controller="Order" asp-action="CancelOrder" method="post" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการยกเลิกคำสั่งซื้อเลขที่ #@Model.OrderId ?');">
+                            <input type="hidden" name="orderId" value="@Model.OrderId" />
+                            <button type="submit" class="btn btn-outline-danger fw-bold">
+                                ยกเลิกคำสั่งซื้อ
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
