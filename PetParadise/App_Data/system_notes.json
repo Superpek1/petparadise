@@ -9,6 +9,16 @@
       "ReportedBy": "2",
       "ReportedAt": "2026-11-18T14:21:12.8016653+07:00",
       "IsResolved": true
+    },
+    {
+      "Id": 2,
+      "ProductId": 2,
+      "ProductName": "\u0E2B\u0E21\u0E32\u0E2D\u0E32\u0E2B\u0E32\u0E23",
+      "IssueType": "\u0E2A\u0E34\u0E19\u0E04\u0E49\u0E32\u0E43\u0E01\u0E25\u0E49\u0E2B\u0E21\u0E14\u0E2D\u0E32\u0E22\u0E38/\u0E2B\u0E21\u0E14\u0E2D\u0E32\u0E22\u0E38",
+      "Detail": "1",
+      "ReportedBy": "1",
+      "ReportedAt": "2026-11-18T15:29:01.9168043+07:00",
+      "IsResolved": false
     }
   ],
   "DeliveryNotes": [
@@ -20,5 +30,7 @@
       "UpdatedAt": "2026-11-18T14:37:27.0519861+07:00"
     }
   ],
-  "PromoCodes": {}
+  "PromoCodes": {
+    "7": "\u0E1F\u0E23\u0E35"
+  }
 }
