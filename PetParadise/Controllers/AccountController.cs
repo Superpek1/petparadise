@@ -13,10 +13,27 @@ public class AccountController : Controller
         _db = db;
     }
 
-    // 1. หน้าเข้าสู่ระบบ (Login) พร้อมสร้างบัญชี Admin เริ่มต้นอัตโนมัติ
+    // 1. หน้าเข้าสู่ระบบ (Login) พร้อมสร้างบัญชี Owner / Admin / Accounting / Marketing เริ่มต้นอัตโนมัติ
     [HttpGet]
     public IActionResult Login()
     {
+        bool seeded = false;
+        if (!_db.Users.Any(u => u.Role == "Owner" || u.Email == "owaner@gmail.com"))
+        {
+            _db.Users.Add(new User
+            {
+                Username = "owaner",
+                Email = "owaner@gmail.com",
+                Password = "1234",
+                FirstName = "เจ้าของกิจการ",
+                LastName = "เพ็ทพาราไดซ์",
+                Phone = "089-999-9999",
+                Role = "Owner",
+                CreatedAt = DateTime.Now
+            });
+            seeded = true;
+        }
+
         if (!_db.Users.Any(u => u.Role == "Admin"))
         {
             _db.Users.Add(new User
@@ -30,6 +47,43 @@ public class AccountController : Controller
                 Role = "Admin",
                 CreatedAt = DateTime.Now
             });
+            seeded = true;
+        }
+
+        if (!_db.Users.Any(u => u.Role == "Accounting"))
+        {
+            _db.Users.Add(new User
+            {
+                Username = "accounting",
+                Email = "accounting@petparadise.com",
+                Password = "1234",
+                FirstName = "ฝ่ายบัญชี",
+                LastName = "การเงิน",
+                Phone = "080-000-0001",
+                Role = "Accounting",
+                CreatedAt = DateTime.Now
+            });
+            seeded = true;
+        }
+
+        if (!_db.Users.Any(u => u.Role == "Marketing"))
+        {
+            _db.Users.Add(new User
+            {
+                Username = "marketing",
+                Email = "marketing@petparadise.com",
+                Password = "1234",
+                FirstName = "ฝ่ายการตลาด",
+                LastName = "โปรโมชั่น",
+                Phone = "080-000-0002",
+                Role = "Marketing",
+                CreatedAt = DateTime.Now
+            });
+            seeded = true;
+        }
+
+        if (seeded)
+        {
             _db.SaveChanges();
         }
 
@@ -50,10 +104,13 @@ public class AccountController : Controller
             HttpContext.Session.SetString("Username", user.Username);
             HttpContext.Session.SetString("Role", user.Role);
 
-            // แยกเส้นทางหลังล็อกอินตาม Role ทั้ง 5 ตำแหน่ง
+            // แยกเส้นทางหลังล็อกอินตาม Role ทั้ง 8 ตำแหน่ง
             return user.Role switch
             {
+                "Owner" => RedirectToAction("Dashboard", "Admin"),
                 "Admin" => RedirectToAction("Dashboard", "Admin"),
+                "Accounting" => RedirectToAction("Reports", "Admin"),
+                "Marketing" => RedirectToAction("Promotions", "Admin"),
                 "Staff" => RedirectToAction("Orders", "Admin"),
                 "Warehouse" => RedirectToAction("Warehouse", "Admin"),
                 "Delivery" => RedirectToAction("Delivery", "Admin"),
@@ -131,6 +188,10 @@ public class AccountController : Controller
 
         if (userProfile == null) return NotFound();
 
+        var notes = PromotionHelper.LoadSystemNotes();
+        ViewBag.PetVerifications = (notes.PetVerifications ?? new List<PetVerificationNote>())
+            .ToDictionary(p => p.PetId, p => p);
+
         return View(userProfile);
     }
 
@@ -160,26 +221,50 @@ public class AccountController : Controller
         return RedirectToAction(nameof(Profile));
     }
 
-    // 4.2 ลงทะเบียนข้อมูลสัตว์เลี้ยง (สำหรับโปรโมชั่น Birthday Pet)
+    // 4.2 ลงทะเบียนข้อมูลสัตว์เลี้ยง พร้อมแนบรูปภาพให้ Staff ตรวจสอบ (สำหรับโปรโมชั่น Birthday Pet)
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult AddPet(int userId, string petName, string petType, DateOnly? birthDate)
+    public IActionResult AddPet(int userId, string petName, string petType, DateOnly? birthDate, IFormFile? petImage)
     {
         int? currentUserId = HttpContext.Session.GetInt32("UserId");
         if (currentUserId == null || currentUserId != userId)
             return RedirectToAction(nameof(Login));
 
+        if (petImage == null || petImage.Length == 0)
+        {
+            TempData["Error"] = "กรุณาแนบรูปถ่ายสัตว์เลี้ยงของคุณเพื่อส่งให้เจ้าหน้าที่ตรวจสอบยืนยัน";
+            return RedirectToAction(nameof(Profile));
+        }
+
         if (!string.IsNullOrWhiteSpace(petName) && !string.IsNullOrWhiteSpace(petType))
         {
-            _db.Pets.Add(new Pet
+            var newPet = new Pet
             {
                 UserId = userId,
                 PetName = petName.Trim(),
                 PetType = petType.Trim(),
                 BirthDate = birthDate
-            });
+            };
+            _db.Pets.Add(newPet);
             _db.SaveChanges();
-            TempData["Success"] = $"ลงทะเบียนสัตว์เลี้ยง '{petName}' เรียบร้อยแล้ว";
+
+            string uploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "pets");
+            Directory.CreateDirectory(uploadFolder);
+
+            string ext = Path.GetExtension(petImage.FileName);
+            if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+            string fileName = $"pet_{newPet.PetId}_{Guid.NewGuid():N}{ext}";
+            string fullPath = Path.Combine(uploadFolder, fileName);
+
+            using (var stream = new FileStream(fullPath, FileMode.Create))
+            {
+                petImage.CopyTo(stream);
+            }
+
+            string savedImagePath = "/uploads/pets/" + fileName;
+            PromotionHelper.SavePetVerification(newPet.PetId, savedImagePath, "Pending");
+
+            TempData["Success"] = $"ส่งข้อมูลและรูปภาพของ '{petName}' เรียบร้อยแล้ว กรุณารอเจ้าหน้าที่ (Staff) ตรวจสอบและกดยืนยัน";
         }
         return RedirectToAction(nameof(Profile));
     }
@@ -195,6 +280,7 @@ public class AccountController : Controller
         {
             _db.Pets.Remove(pet);
             _db.SaveChanges();
+            PromotionHelper.RemovePetVerification(petId);
             TempData["Success"] = "ลบข้อมูลสัตว์เลี้ยงเรียบร้อยแล้ว";
         }
         return RedirectToAction(nameof(Profile));
@@ -213,6 +299,7 @@ public class AccountController : Controller
             address.IsDefault = !_db.Addresses.Any(a => a.UserId == address.UserId);
             _db.Addresses.Add(address);
             _db.SaveChanges();
+            TempData["Success"] = "เพิ่มที่อยู่จัดส่งใหม่เรียบร้อยแล้ว";
         }
 
         return RedirectToAction(nameof(Profile));
@@ -223,16 +310,18 @@ public class AccountController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult EditAddress(Address address)
     {
+        int? currentUserId = HttpContext.Session.GetInt32("UserId");
         var existing = _db.Addresses.Find(address.AddressId);
-        if (existing != null)
+        if (existing != null && existing.UserId == currentUserId)
         {
-            existing.RecipientName = address.RecipientName;
-            existing.Phone = address.Phone;
-            existing.AddressDetail = address.AddressDetail;
-            existing.District = address.District;
-            existing.Province = address.Province;
-            existing.PostalCode = address.PostalCode;
+            existing.RecipientName = address.RecipientName.Trim();
+            existing.Phone = address.Phone.Trim();
+            existing.AddressDetail = address.AddressDetail.Trim();
+            existing.District = address.District.Trim();
+            existing.Province = address.Province.Trim();
+            existing.PostalCode = address.PostalCode.Trim();
             _db.SaveChanges();
+            TempData["Success"] = "แก้ไขที่อยู่จัดส่งเรียบร้อยแล้ว";
         }
         return RedirectToAction(nameof(Profile));
     }
@@ -242,11 +331,19 @@ public class AccountController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult DeleteAddress(int addressId)
     {
+        int? currentUserId = HttpContext.Session.GetInt32("UserId");
         var addr = _db.Addresses.Find(addressId);
-        if (addr != null && !_db.Orders.Any(o => o.AddressId == addressId))
+        if (addr != null && addr.UserId == currentUserId)
         {
+            if (_db.Orders.Any(o => o.AddressId == addressId))
+            {
+                TempData["Error"] = "ไม่สามารถลบที่อยู่นี้ได้ เนื่องจากถูกใช้งานในประวัติคำสั่งซื้อแล้ว (คุณสามารถกดปุ่ม 'แก้ไข' เพื่อปรับปรุงข้อมูลที่อยู่แทนได้)";
+                return RedirectToAction(nameof(Profile));
+            }
+
             _db.Addresses.Remove(addr);
             _db.SaveChanges();
+            TempData["Success"] = "ลบที่อยู่จัดส่งเรียบร้อยแล้ว";
         }
         return RedirectToAction(nameof(Profile));
     }

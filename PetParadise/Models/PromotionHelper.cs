@@ -45,11 +45,22 @@ public class TopSellingProductSummary
     public int StockQuantity { get; set; }
 }
 
+public class PetVerificationNote
+{
+    public int PetId { get; set; }
+    public string ImageUrl { get; set; } = "";
+    public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected
+    public string? VerifiedBy { get; set; }
+    public DateTime? VerifiedAt { get; set; }
+    public string? Remark { get; set; }
+}
+
 public class SystemNotesData
 {
     public List<WarehouseIssueNote> WarehouseIssues { get; set; } = new();
     public List<DeliveryTrackingNote> DeliveryNotes { get; set; } = new();
     public Dictionary<int, string> PromoCodes { get; set; } = new();
+    public List<PetVerificationNote> PetVerifications { get; set; } = new();
 }
 
 public static class PromotionHelper
@@ -332,14 +343,39 @@ public static class PromotionHelper
             {
                 decimal pct = promo.DiscountPercent ?? 20m;
                 decimal maxD = promo.MaxDiscount ?? 200m;
-                result.ConditionText = $"ลด {pct:N0}% ในเดือนเกิดสัตว์เลี้ยงที่ลงทะเบียนไว้ • ลดสูงสุด {maxD:N0}฿";
+                result.ConditionText = $"ลด {pct:N0}% ในเดือนเกิดสัตว์เลี้ยงที่ลงทะเบียนและผ่านการยืนยันรูปภาพแล้ว • ลดสูงสุด {maxD:N0}฿";
                 int currentMonth = DateTime.Now.Month;
-                bool hasBirthdayPet = db.Pets.Any(p => p.UserId == userId && p.BirthDate != null && p.BirthDate.Value.Month == currentMonth);
-                if (!hasBirthdayPet)
+                var birthdayPets = db.Pets
+                    .Where(p => p.UserId == userId && p.BirthDate != null && p.BirthDate.Value.Month == currentMonth)
+                    .ToList();
+
+                if (!birthdayPets.Any())
                 {
-                    result.IneligibleReason = "ไม่มีสัตว์เลี้ยงที่เกิดในเดือนนี้ (ลงทะเบียนได้ที่หน้าโปรไฟล์)";
+                    result.IneligibleReason = "ไม่มีสัตว์เลี้ยงที่เกิดในเดือนนี้ (ลงทะเบียนพร้อมแนบรูปได้ที่หน้าโปรไฟล์)";
                     return result;
                 }
+
+                var notes = LoadSystemNotes();
+                bool hasApprovedPet = birthdayPets.Any(p =>
+                {
+                    var v = GetPetVerification(p.PetId, notes);
+                    return v != null && v.Status == "Approved";
+                });
+
+                if (!hasApprovedPet)
+                {
+                    bool hasPendingPet = birthdayPets.Any(p =>
+                    {
+                        var v = GetPetVerification(p.PetId, notes);
+                        return v == null || v.Status == "Pending";
+                    });
+
+                    result.IneligibleReason = hasPendingPet
+                        ? "ข้อมูลและรูปสัตว์เลี้ยงของคุณอยู่ระหว่างรอเจ้าหน้าที่ (Staff) ตรวจสอบและกดยืนยัน"
+                        : "รูปสัตว์เลี้ยงไม่ผ่านการยืนยัน กรุณาลบและลงทะเบียนสัตว์เลี้ยงพร้อมแนบรูปใหม่อีกครั้ง";
+                    return result;
+                }
+
                 if (subtotal < minPurchase)
                 {
                     result.IneligibleReason = $"ยอดสั่งซื้อขั้นต่ำ {minPurchase:N0}฿";
@@ -407,5 +443,50 @@ public static class PromotionHelper
         string path = GetNotesFilePath();
         string json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(path, json);
+    }
+
+    public static PetVerificationNote? GetPetVerification(int petId, SystemNotesData? notes = null)
+    {
+        notes ??= LoadSystemNotes();
+        return notes.PetVerifications?.FirstOrDefault(p => p.PetId == petId);
+    }
+
+    public static void SavePetVerification(int petId, string? imageUrl, string status = "Pending", string? verifiedBy = null, string? remark = null)
+    {
+        var notes = LoadSystemNotes();
+        notes.PetVerifications ??= new List<PetVerificationNote>();
+        var existing = notes.PetVerifications.FirstOrDefault(p => p.PetId == petId);
+        if (existing == null)
+        {
+            existing = new PetVerificationNote
+            {
+                PetId = petId,
+                ImageUrl = imageUrl ?? "",
+                Status = status,
+                VerifiedBy = verifiedBy,
+                VerifiedAt = status != "Pending" ? DateTime.Now : null,
+                Remark = remark
+            };
+            notes.PetVerifications.Add(existing);
+        }
+        else
+        {
+            if (!string.IsNullOrEmpty(imageUrl)) existing.ImageUrl = imageUrl;
+            existing.Status = status;
+            existing.VerifiedBy = verifiedBy;
+            existing.VerifiedAt = DateTime.Now;
+            existing.Remark = remark;
+        }
+        SaveSystemNotes(notes);
+    }
+
+    public static void RemovePetVerification(int petId)
+    {
+        var notes = LoadSystemNotes();
+        if (notes.PetVerifications != null)
+        {
+            notes.PetVerifications.RemoveAll(p => p.PetId == petId);
+            SaveSystemNotes(notes);
+        }
     }
 }

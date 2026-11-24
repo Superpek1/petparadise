@@ -1,5 +1,6 @@
 @model IEnumerable<PetParadise.Models.Order>
 @{
+    var currentRole = Context.Session.GetString("Role");
     var lowStock = ViewBag.LowStockProducts as List<PetParadise.Models.Product> ?? new List<PetParadise.Models.Product>();
     var topSelling = ViewBag.TopSellingProducts as List<PetParadise.Models.TopSellingProductSummary> ?? new List<PetParadise.Models.TopSellingProductSummary>();
     var warehouseIssues = ViewBag.WarehouseIssues as List<PetParadise.Models.WarehouseIssueNote> ?? new List<PetParadise.Models.WarehouseIssueNote>();
@@ -7,8 +8,13 @@
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h3 class="fw-bold mb-0">แดชบอร์ดผู้ดูแลระบบ (Admin Dashboard)</h3>
-        <div class="d-flex gap-2">
+        <h3 class="fw-bold mb-0">
+            @(currentRole == "Owner" ? "👑 แดชบอร์ดเจ้าของกิจการ (Owner Executive Dashboard)" : "แดชบอร์ดผู้ดูแลระบบ (Admin Dashboard)")
+        </h3>
+        <div class="d-flex gap-2 flex-wrap">
+            <a asp-action="Pets" class="btn btn-warning fw-bold">
+                🐾 ตรวจรูปสัตว์เลี้ยง @(ViewBag.PendingPetsCount != null && (int)ViewBag.PendingPetsCount > 0 ? $"({ViewBag.PendingPetsCount})" : "")
+            </a>
             <a asp-action="Reports" class="btn btn-success">📊 ดูรายงานทั้งหมด</a>
             <a asp-action="Orders" class="btn btn-primary">จัดการคำสั่งซื้อ</a>
             <a asp-controller="AdminProduct" asp-action="Index" class="btn btn-dark">🛍️ จัดการสินค้า</a>
@@ -50,6 +56,47 @@
             </div>
         </div>
     </div>
+
+    @if (currentRole == "Owner")
+    {
+        <div class="card shadow-sm border-warning border-2 mb-4" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <span class="badge bg-dark text-warning mb-1">👑 OWNER EXCLUSIVE</span>
+                        <h5 class="fw-bold mb-0 text-dark">ข้อมูลผลประกอบการและทรัพย์สินเชิงลึก (เฉพาะเจ้าของกิจการ — Admin ไม่สามารถมองเห็นส่วนนี้ได้)</h5>
+                    </div>
+                    <a asp-action="Users" class="btn btn-dark btn-sm fw-bold">จัดการสิทธิ์ผู้ดูแลระบบ & พนักงาน</a>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="p-3 bg-white rounded shadow-sm h-100">
+                            <small class="text-muted fw-bold">รายได้สุทธิ (หลังหักภาษี VAT 7%)</small>
+                            <h4 class="fw-bold text-dark mt-1 mb-0">@(((decimal)(ViewBag.NetRevenueExVat ?? 0m)).ToString("N2")) ฿</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 bg-white rounded shadow-sm h-100">
+                            <small class="text-muted fw-bold">กำไรขั้นต้นโดยประมาณ (Margin 35%)</small>
+                            <h4 class="fw-bold text-success mt-1 mb-0">+@(((decimal)(ViewBag.EstimatedGrossProfit ?? 0m)).ToString("N2")) ฿</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 bg-white rounded shadow-sm h-100">
+                            <small class="text-muted fw-bold">มูลค่าทรัพย์สินสินค้าคงคลังทั้งหมด</small>
+                            <h4 class="fw-bold text-primary mt-1 mb-0">@(((decimal)(ViewBag.TotalInventoryValuation ?? 0m)).ToString("N2")) ฿</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 bg-white rounded shadow-sm h-100">
+                            <small class="text-muted fw-bold">บุคลากรในองค์กรทั้งหมด</small>
+                            <h4 class="fw-bold text-secondary mt-1 mb-0">@ViewBag.TotalStaffCount คน <small class="fs-6 text-muted">(Admin @ViewBag.TotalAdminCount)</small></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 
     @if (warehouseIssues.Any())
     {

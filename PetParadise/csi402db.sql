@@ -14,15 +14,6 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-SET @MYSQLDUMP_TEMP_LOG_BIN = @@SESSION.SQL_LOG_BIN;
-SET @@SESSION.SQL_LOG_BIN= 0;
-
---
--- GTID state at the beginning of the backup 
---
-
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '1319c3c1-e317-11f1-8cac-0a0027000004:1-46,
-65a46e82-bfe7-11f1-949d-02509dcb30ee:1-86';
 
 --
 -- Current Database: `csi402db`
@@ -201,7 +192,7 @@ CREATE TABLE `orderitems` (
 
 LOCK TABLES `orderitems` WRITE;
 /*!40000 ALTER TABLE `orderitems` DISABLE KEYS */;
-INSERT INTO `orderitems` VALUES (1,1,1,1,0.01,0.00),(2,1,3,1,0.02,0.00),(3,2,3,2,1000.00,0.00),(4,3,4,2,500.00,0.00),(5,4,3,2,1000.00,0.00),(6,4,1,1,0.01,0.00),(7,5,3,1,1000.00,0.00);
+INSERT INTO `orderitems` VALUES (1,1,1,1,0.01,0.01),(2,1,3,1,0.02,0.02),(3,2,3,2,1000.00,2000.00),(4,3,4,2,500.00,1000.00),(5,4,3,2,1000.00,2000.00),(6,4,1,1,0.01,0.01),(7,5,3,1,1000.00,1000.00);
 /*!40000 ALTER TABLE `orderitems` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -446,7 +437,7 @@ CREATE TABLE `users` (
   `role` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -455,10 +446,9 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Sa','sa@gmail.com','111111','sa','sa','1','Customer','2026-10-14 14:49:52'),(2,'Sa','Sa@gmail.com','111111','sa','sa','1','Customer','2026-10-14 14:50:11'),(3,'Sa','Sa@gmail.com','1111','1','1','1','Customer','2026-10-14 14:52:50'),(4,'s','s@gmail','s','s','s','s','Customer','2026-10-14 14:53:14'),(5,'Sutan','Bu@gmail.com','111111','SA','SU','1','Customer','2026-10-16 19:13:28'),(6,'Sutan','SAA@gmail.com','1','sa','sa','1','Customer','2026-10-16 19:14:15'),(7,'S1','12@gmail.com','1','1','12','1','Customer','2026-10-24 15:52:00'),(8,'Sa1','Sa22@gmail.com','1','Sa','SA','1','Customer','2026-11-17 09:26:29'),(9,'admin','admin@petparadise.com','1234','ผู้ดูแลระบบ','หลัก','080-000-0000','Admin','2026-11-17 10:00:47'),(10,'1','1@g','1','1','1',NULL,'Staff','2026-11-17 10:15:12'),(11,'2','2@g','2','2','2',NULL,'Warehouse','2026-11-17 10:15:24'),(12,'3','3@g','3','3','3',NULL,'Delivery','2026-11-17 10:15:32'),(13,'nam','nam@g','1','แหนม','หมู','1','Customer','2026-11-18 15:08:47');
+INSERT INTO `users` VALUES (1,'Sa','sa@gmail.com','111111','sa','sa','1','Customer','2026-10-14 14:49:52'),(2,'Sa','Sa@gmail.com','111111','sa','sa','1','Customer','2026-10-14 14:50:11'),(3,'Sa','Sa@gmail.com','1111','1','1','1','Customer','2026-10-14 14:52:50'),(4,'s','s@gmail','s','s','s','s','Customer','2026-10-14 14:53:14'),(5,'Sutan','Bu@gmail.com','111111','SA','SU','1','Customer','2026-10-16 19:13:28'),(6,'Sutan','SAA@gmail.com','1','sa','sa','1','Customer','2026-10-16 19:14:15'),(7,'S1','12@gmail.com','1','1','12','1','Customer','2026-10-24 15:52:00'),(8,'Sa1','Sa22@gmail.com','1','Sa','SA','1','Customer','2026-11-17 09:26:29'),(9,'admin','admin@petparadise.com','1234','ผู้ดูแลระบบ','หลัก','080-000-0000','Admin','2026-11-17 10:00:47'),(10,'1','1@g','1','1','1',NULL,'Staff','2026-11-17 10:15:12'),(11,'2','2@g','2','2','2',NULL,'Warehouse','2026-11-17 10:15:24'),(12,'3','3@g','3','3','3',NULL,'Delivery','2026-11-17 10:15:32'),(13,'nam','nam@g','1','แหนม','หมู','1','Customer','2026-11-18 15:08:47'),(14,'accounting','accounting@petparadise.com','1234','ฝ่ายบัญชี','การเงิน','080-000-0001','Accounting','2026-11-23 13:00:00'),(15,'marketing','marketing@petparadise.com','1234','ฝ่ายการตลาด','โปรโมชั่น','080-000-0002','Marketing','2026-11-23 13:00:00'),(16,'owaner','owaner@gmail.com','1234','เจ้าของกิจการ','เพ็ทพาราไดซ์','089-999-9999','Owner','2026-11-25 00:55:00');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
-SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

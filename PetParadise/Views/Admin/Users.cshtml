@@ -1,11 +1,22 @@
 @model IEnumerable<PetParadise.Models.User>
 @{
-    string[] allRoles = { "Customer", "Staff", "Warehouse", "Delivery", "Admin" };
+    var currentRole = Context.Session.GetString("Role");
+    var currentUserId = Context.Session.GetInt32("UserId");
+    bool isOwner = currentRole == "Owner";
+    string[] allRoles = isOwner
+        ? new[] { "Customer", "Staff", "Warehouse", "Delivery", "Accounting", "Marketing", "Admin", "Owner" }
+        : new[] { "Customer", "Staff", "Warehouse", "Delivery", "Accounting", "Marketing", "Admin" };
 }
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold mb-0">จัดการผู้ใช้งานและสิทธิ์</h3>
+        <div>
+            <h3 class="fw-bold mb-0">จัดการผู้ใช้งานและสิทธิ์ @(isOwner ? "(มุมมองเจ้าของกิจการ - เห็นทุกตำแหน่ง)" : "(มุมมองผู้ดูแลระบบ)")</h3>
+            @if (!isOwner)
+            {
+                <small class="text-muted">หมายเหตุ: ผู้ดูแลระบบ (Admin) ไม่สามารถมองเห็นบัญชีของเจ้าของกิจการ (Owner) และไม่สามารถแก้ไขตำแหน่งของตัวเองได้</small>
+            }
+        </div>
         <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
     </div>
 
@@ -52,10 +63,16 @@
                 <div class="col-md-2 d-flex gap-1">
                     <select name="Role" class="form-select form-select-sm">
                         <option value="Customer">Customer (ลูกค้า)</option>
-                        <option value="Staff">Staff (พนักงาน)</option>
+                        <option value="Staff">Staff (พนักงานรับออเดอร์)</option>
                         <option value="Warehouse">Warehouse (คลังสินค้า)</option>
                         <option value="Delivery">Delivery (จัดส่งสินค้า)</option>
+                        <option value="Accounting">Accounting (บัญชีและการเงิน)</option>
+                        <option value="Marketing">Marketing (การตลาดและโปรโมชั่น)</option>
                         <option value="Admin">Admin (ผู้ดูแลระบบ)</option>
+                        @if (isOwner)
+                        {
+                            <option value="Owner">Owner (เจ้าของกิจการ)</option>
+                        }
                     </select>
                     <button type="submit" class="btn btn-success btn-sm fw-bold">เพิ่ม</button>
                 </div>
@@ -88,26 +105,48 @@
                                 <td>@u.FirstName @u.LastName</td>
                                 <td>@u.Email<br /><small class="text-muted">@(u.Phone ?? "-")</small></td>
                                 <td>
-                                    <span class="badge @(u.Role == "Admin" ? "bg-danger" : u.Role == "Customer" ? "bg-secondary" : "bg-primary")">@u.Role</span>
+                                    <span class="badge @(u.Role == "Owner" ? "bg-dark text-warning border border-warning" : u.Role == "Admin" ? "bg-danger" : u.Role == "Accounting" ? "bg-success" : u.Role == "Marketing" ? "bg-warning text-dark" : u.Role == "Customer" ? "bg-secondary" : "bg-primary")">
+                                        @(u.Role == "Owner" ? "👑 Owner" : u.Role)
+                                    </span>
                                 </td>
                                 <td>
-                                    <form asp-action="UpdateUserRole" method="post" class="d-flex gap-1">
-                                        <input type="hidden" name="userId" value="@u.UserId" />
-                                        <select name="newRole" class="form-select form-select-sm" style="width: 150px;">
-                                            <option value="Customer" selected="@(u.Role == "Customer")">Customer (ลูกค้า)</option>
-                                            <option value="Staff" selected="@(u.Role == "Staff")">Staff (พนักงาน)</option>
-                                            <option value="Warehouse" selected="@(u.Role == "Warehouse")">Warehouse (คลังสินค้า)</option>
-                                            <option value="Delivery" selected="@(u.Role == "Delivery")">Delivery (จัดส่ง)</option>
-                                            <option value="Admin" selected="@(u.Role == "Admin")">Admin (ผู้ดูแลระบบ)</option>
-                                        </select>
-                                        <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>
-                                    </form>
+                                    @if (u.UserId == currentUserId)
+                                    {
+                                        <span class="badge bg-light text-secondary border">🔒 ไม่สามารถแก้ไขตำแหน่งตัวเองได้</span>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="UpdateUserRole" method="post" class="d-flex gap-1">
+                                            <input type="hidden" name="userId" value="@u.UserId" />
+                                            <select name="newRole" class="form-select form-select-sm" style="width: 185px;">
+                                                <option value="Customer" selected="@(u.Role == "Customer")">Customer (ลูกค้า)</option>
+                                                <option value="Staff" selected="@(u.Role == "Staff")">Staff (พนักงาน)</option>
+                                                <option value="Warehouse" selected="@(u.Role == "Warehouse")">Warehouse (คลังสินค้า)</option>
+                                                <option value="Delivery" selected="@(u.Role == "Delivery")">Delivery (จัดส่ง)</option>
+                                                <option value="Accounting" selected="@(u.Role == "Accounting")">Accounting (บัญชี/การเงิน)</option>
+                                                <option value="Marketing" selected="@(u.Role == "Marketing")">Marketing (การตลาด)</option>
+                                                <option value="Admin" selected="@(u.Role == "Admin")">Admin (ผู้ดูแลระบบ)</option>
+                                                @if (isOwner)
+                                                {
+                                                    <option value="Owner" selected="@(u.Role == "Owner")">Owner (เจ้าของกิจการ)</option>
+                                                }
+                                            </select>
+                                            <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>
+                                        </form>
+                                    }
                                 </td>
                                 <td>
-                                    <form asp-action="DeleteUser" method="post" onsubmit="return confirm('ยืนยันการลบผู้ใช้ @u.Username ?');">
-                                        <input type="hidden" name="userId" value="@u.UserId" />
-                                        <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
-                                    </form>
+                                    @if (u.UserId == currentUserId)
+                                    {
+                                        <span class="text-muted small">บัญชีที่ใช้งานอยู่</span>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="DeleteUser" method="post" onsubmit="return confirm('ยืนยันการลบผู้ใช้ @u.Username ?');">
+                                            <input type="hidden" name="userId" value="@u.UserId" />
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                                        </form>
+                                    }
                                 </td>
                             </tr>
                         }

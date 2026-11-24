@@ -1,0 +1,148 @@
+@model IEnumerable<PetParadise.Models.Pet>
+@{
+    ViewData["Title"] = "ตรวจสอบและยืนยันข้อมูลสัตว์เลี้ยง";
+    var currentRole = Context.Session.GetString("Role");
+    var verifyDict = ViewBag.PetVerifications as Dictionary<int, PetParadise.Models.PetVerificationNote>
+                     ?? new Dictionary<int, PetParadise.Models.PetVerificationNote>();
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h3 class="fw-bold mb-1">🐾 ตรวจสอบและยืนยันข้อมูลสัตว์เลี้ยงของลูกค้า (Staff Verification)</h3>
+            <p class="text-muted small mb-0">
+                ตรวจสอบรูปถ่ายสัตว์เลี้ยงของลูกค้าก่อนอนุมัติสิทธิ์โปรโมชั่น <strong>Birthday Pet (ลด 20% เดือนเกิดสัตว์เลี้ยง)</strong>
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="Orders" class="btn btn-outline-primary">ไปหน้าคำสั่งซื้อ</a>
+            @if (currentRole == "Admin" || currentRole == "Owner")
+            {
+                <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+            }
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">@TempData["Error"]</div>
+    }
+
+    <!-- ตัวกรองสถานะ -->
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+        <a asp-action="Pets" class="btn btn-sm @(ViewBag.StatusFilter == null ? "btn-dark" : "btn-outline-dark")">ทั้งหมด</a>
+        <a asp-action="Pets" asp-route-statusFilter="Pending" class="btn btn-sm @(ViewBag.StatusFilter == "Pending" ? "btn-warning" : "btn-outline-warning")">⏳ รอตรวจสอบ (Pending)</a>
+        <a asp-action="Pets" asp-route-statusFilter="Approved" class="btn btn-sm @(ViewBag.StatusFilter == "Approved" ? "btn-success" : "btn-outline-success")">✅ ยืนยันแล้ว (Approved)</a>
+        <a asp-action="Pets" asp-route-statusFilter="Rejected" class="btn btn-sm @(ViewBag.StatusFilter == "Rejected" ? "btn-danger" : "btn-outline-danger")">❌ ไม่อนุมัติ (Rejected)</a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>รหัส</th>
+                                <th>รูปถ่ายสัตว์เลี้ยง</th>
+                                <th>ชื่อและประเภทสัตว์เลี้ยง</th>
+                                <th>วันเกิดสัตว์เลี้ยง</th>
+                                <th>เจ้าของ (ลูกค้า)</th>
+                                <th>สถานะการตรวจสอบ</th>
+                                <th>การยืนยันโดยเจ้าหน้าที่ (Staff)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var pet in Model)
+                            {
+                                var v = verifyDict.ContainsKey(pet.PetId) ? verifyDict[pet.PetId] : null;
+                                string status = v?.Status ?? "Pending";
+                                bool isBirthMonth = pet.BirthDate != null && pet.BirthDate.Value.Month == DateTime.Now.Month;
+
+                                <tr>
+                                    <td class="fw-bold">#@pet.PetId</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(v?.ImageUrl))
+                                        {
+                                            <a href="@v.ImageUrl" target="_blank" class="d-inline-block">
+                                                <img src="@v.ImageUrl" alt="@pet.PetName" class="rounded border shadow-sm" style="width: 90px; height: 90px; object-fit: cover;" />
+                                            </a>
+                                            <div class="small mt-1">
+                                                <a href="@v.ImageUrl" target="_blank" class="text-decoration-none">🔍 ดูรูปเต็ม</a>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">ไม่มีรูปแนบ</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold fs-6">@pet.PetName</div>
+                                        <span class="badge bg-info text-dark">@pet.PetType</span>
+                                    </td>
+                                    <td>
+                                        <div>@(pet.BirthDate?.ToString("dd/MM/yyyy") ?? "-")</div>
+                                        @if (isBirthMonth)
+                                        {
+                                            <span class="badge bg-warning text-dark mt-1">🎂 เดือนเกิดเดือนนี้!</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold">@(pet.User?.FirstName) @(pet.User?.LastName)</div>
+                                        <small class="text-muted">Username: @(pet.User?.Username) | @(pet.User?.Email)</small>
+                                    </td>
+                                    <td>
+                                        @if (status == "Approved")
+                                        {
+                                            <span class="badge bg-success">✅ ยืนยันแล้ว (Approved)</span>
+                                            @if (!string.IsNullOrEmpty(v?.VerifiedBy))
+                                            {
+                                                <div class="small text-muted mt-1">โดย: @v.VerifiedBy</div>
+                                            }
+                                        }
+                                        else if (status == "Rejected")
+                                        {
+                                            <span class="badge bg-danger">❌ ไม่อนุมัติ (Rejected)</span>
+                                            @if (!string.IsNullOrEmpty(v?.Remark))
+                                            {
+                                                <div class="small text-danger mt-1">เหตุผล: @v.Remark</div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning text-dark">⏳ รอเจ้าหน้าที่ตรวจสอบ</span>
+                                        }
+                                    </td>
+                                    <td style="min-width: 240px;">
+                                        <form asp-action="VerifyPet" method="post" class="d-flex flex-column gap-2">
+                                            <input type="hidden" name="petId" value="@pet.PetId" />
+                                            <input type="text" name="remark" class="form-control form-control-sm"
+                                                   placeholder="หมายเหตุ (เช่น รูปไม่ชัดเจน / ไม่ใช่สัตว์เลี้ยง)" value="@(v?.Remark)" />
+                                            <div class="d-flex gap-2">
+                                                <button type="submit" name="decision" value="Approved" class="btn btn-success btn-sm flex-grow-1 fw-bold">
+                                                    ✅ ยืนยันสัตว์เลี้ยงจริง
+                                                </button>
+                                                <button type="submit" name="decision" value="Rejected" class="btn btn-outline-danger btn-sm">
+                                                    ❌ ปฏิเสธ
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted mb-0 text-center py-4">ยังไม่มีรายการลงทะเบียนสัตว์เลี้ยงในสถานะนี้</p>
+            }
+        </div>
+    </div>
+</div>

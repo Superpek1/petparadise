@@ -6,6 +6,15 @@
         <a asp-action="Create" class="btn btn-primary">+ Add New Product</a>
     </div>
 
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success">@TempData["Success"]</div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-warning">@TempData["Error"]</div>
+    }
+
     <table class="table table-bordered table-striped align-middle text-center">
         <thead class="table-dark">
             <tr>

@@ -311,7 +311,8 @@ public class CartController : Controller
                 OrderId = order.OrderId,
                 ProductId = item.ProductId,
                 Quantity = item.Quantity,
-                UnitPrice = item.Product.Price
+                UnitPrice = item.Product.Price,
+                Subtotal = item.Quantity * item.Product.Price
             });
 
             if (item.Product.StockQuantity >= item.Quantity)

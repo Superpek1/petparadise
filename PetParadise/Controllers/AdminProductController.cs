@@ -15,11 +15,11 @@ public class AdminProductController : Controller
         _db = db;
     }
 
-    // ตัวกรองสิทธิ์: อนุญาตเฉพาะ Role == "Admin" เท่านั้น
+    // ตัวกรองสิทธิ์: อนุญาตเฉพาะ Role == "Admin" หรือ "Owner" เท่านั้น
     public override void OnActionExecuting(ActionExecutingContext context)
     {
         var role = HttpContext.Session.GetString("Role");
-        if (role != "Admin")
+        if (role != "Admin" && role != "Owner")
         {
             context.Result = RedirectToAction("Login", "Account");
         }
@@ -200,11 +200,33 @@ public class AdminProductController : Controller
         var product = (from p in _db.Products where p.ProductId == id select p).FirstOrDefault();
         if (product != null)
         {
+            var cartItems = _db.Cartitems.Where(ci => ci.ProductId == id).ToList();
+            if (cartItems.Any())
+            {
+                _db.Cartitems.RemoveRange(cartItems);
+            }
+
+            bool hasOrderHistory = _db.Orderitems.Any(oi => oi.ProductId == id);
+            if (hasOrderHistory)
+            {
+                product.Status = "Inactive";
+                _db.SaveChanges();
+                TempData["Error"] = $"สินค้า '{product.ProductName}' มีประวัติในคำสั่งซื้อแล้ว ระบบจึงเปลี่ยนสถานะเป็น Inactive แทนการลบถาวร";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var reviews = _db.Reviews.Where(r => r.ProductId == id).ToList();
+            if (reviews.Any())
+            {
+                _db.Reviews.RemoveRange(reviews);
+            }
+
             var images = (from i in _db.Productimages where i.ProductId == id select i).ToList();
             _db.Productimages.RemoveRange(images);
 
             _db.Products.Remove(product);
             _db.SaveChanges();
+            TempData["Success"] = $"ลบสินค้า '{product.ProductName}' เรียบร้อยแล้ว";
         }
 
         return RedirectToAction(nameof(Index));

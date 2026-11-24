@@ -1,6 +1,7 @@
 @model IEnumerable<PetParadise.Models.Order>
 @{
     ViewData["Title"] = "รายงานระบบ";
+    var currentRole = Context.Session.GetString("Role");
     var topSelling = ViewBag.TopSellingProducts as List<PetParadise.Models.TopSellingProductSummary> ?? new List<PetParadise.Models.TopSellingProductSummary>();
     var inventory = ViewBag.AllProductsInventory as List<PetParadise.Models.Product> ?? new List<PetParadise.Models.Product>();
 }
@@ -8,8 +9,36 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="fw-bold mb-0">📊 รายงานระบบ (ยอดขาย, คำสั่งซื้อ, สินค้าขายดี, สินค้าคงเหลือ)</h3>
-        <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+        @if (currentRole == "Admin" || currentRole == "Owner")
+        {
+            <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+        }
+        else if (currentRole == "Accounting")
+        {
+            <a asp-action="Orders" class="btn btn-outline-primary">🧾 ตรวจสอบสลิป & คำสั่งซื้อ</a>
+        }
+        else if (currentRole == "Marketing")
+        {
+            <a asp-action="Promotions" class="btn btn-outline-warning text-dark">🎁 จัดการแคมเปญโปรโมชั่น</a>
+        }
     </div>
+
+    @if (currentRole == "Owner")
+    {
+        <div class="alert alert-warning border-warning shadow-sm mb-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <span class="badge bg-dark text-warning me-2">👑 เฉพาะเจ้าของกิจการ (Owner Only)</span>
+                    <strong>สรุปผลประกอบการสุทธิและมูลค่าคลังสินค้า (ข้อมูลความลับระดับบริหาร — Admin ไม่เห็นส่วนนี้):</strong>
+                </div>
+                <div class="d-flex gap-4 flex-wrap">
+                    <span>รายได้หัก VAT: <strong class="text-dark">@(((decimal)(ViewBag.NetRevenueExVat ?? 0m)).ToString("N2")) ฿</strong></span>
+                    <span>กำไรขั้นต้นประเมิน (35%): <strong class="text-success">+@(((decimal)(ViewBag.EstimatedGrossProfit ?? 0m)).ToString("N2")) ฿</strong></span>
+                    <span>มูลค่าสต็อกคงคลังรวม: <strong class="text-primary">@(((decimal)(ViewBag.TotalInventoryValuation ?? 0m)).ToString("N2")) ฿</strong></span>
+                </div>
+            </div>
+        </div>
+    }
 
     <!-- 1. รายงานยอดขาย & รายงานจำนวนคำสั่งซื้อ -->
     <div class="row g-3 mb-4">

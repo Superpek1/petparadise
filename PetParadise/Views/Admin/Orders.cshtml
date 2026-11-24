@@ -1,9 +1,27 @@
 @model IEnumerable<PetParadise.Models.Order>
+@{
+    var currentRole = Context.Session.GetString("Role");
+}
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold mb-0">จัดการคำสั่งซื้อลูกค้า</h3>
-        <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+        <h3 class="fw-bold mb-0">จัดการคำสั่งซื้อและตรวจสอบการชำระเงิน</h3>
+        <div class="d-flex gap-2">
+            @if (currentRole == "Admin" || currentRole == "Owner" || currentRole == "Staff")
+            {
+                <a asp-action="Pets" class="btn btn-warning fw-bold">
+                    🐾 ตรวจสอบสัตว์เลี้ยง @(ViewBag.PendingPetsCount != null && (int)ViewBag.PendingPetsCount > 0 ? $"({ViewBag.PendingPetsCount} รอตรวจ)" : "")
+                </a>
+            }
+            @if (currentRole == "Admin" || currentRole == "Owner")
+            {
+                <a asp-action="Dashboard" class="btn btn-outline-secondary">กลับหน้า Dashboard</a>
+            }
+            else if (currentRole == "Accounting")
+            {
+                <a asp-action="Reports" class="btn btn-outline-success">📊 ดูรายงานการเงิน & ภาษี</a>
+            }
+        </div>
     </div>
 
     @if (TempData["Success"] != null)
@@ -87,16 +105,23 @@
                                     {
                                         <span class="text-success small fw-bold">จัดส่งสำเร็จ</span>
                                     }
+                                    else if (currentRole == "Accounting" && ord.Status != "Pending" && ord.Status != "Paid")
+                                    {
+                                        <span class="text-muted small">ดำเนินการต่อโดยฝ่ายคลัง/ขนส่ง (@ord.Status)</span>
+                                    }
                                     else
                                     {
                                         <form asp-action="UpdateOrderStatus" method="post" class="d-flex gap-1">
                                             <input type="hidden" name="orderId" value="@ord.OrderId" />
-                                            <select name="newStatus" class="form-select form-select-sm" style="width: 145px;">
-                                                <option value="Pending" selected="@(ord.Status == "Pending")">Pending</option>
+                                            <select name="newStatus" class="form-select form-select-sm" style="width: 155px;">
+                                                <option value="Pending" selected="@(ord.Status == "Pending")">Pending (รอตรวจยอด)</option>
                                                 <option value="Paid" selected="@(ord.Status == "Paid")">Paid (ชำระแล้ว)</option>
-                                                <option value="Preparing" selected="@(ord.Status == "Preparing")">Preparing (เตรียมส่ง)</option>
-                                                <option value="Shipped" selected="@(ord.Status == "Shipped")">Shipped (จัดส่งแล้ว)</option>
-                                                <option value="Completed" selected="@(ord.Status == "Completed")">Completed (สำเร็จ)</option>
+                                                @if (currentRole != "Accounting")
+                                                {
+                                                    <option value="Preparing" selected="@(ord.Status == "Preparing")">Preparing (เตรียมส่ง)</option>
+                                                    <option value="Shipped" selected="@(ord.Status == "Shipped")">Shipped (จัดส่งแล้ว)</option>
+                                                    <option value="Completed" selected="@(ord.Status == "Completed")">Completed (สำเร็จ)</option>
+                                                }
                                                 <option value="Cancelled" selected="@(ord.Status == "Cancelled")">Cancelled (ยกเลิก)</option>
                                             </select>
                                             <button type="submit" class="btn btn-primary btn-sm">บันทึก</button>

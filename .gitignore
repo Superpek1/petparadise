@@ -28,6 +28,8 @@ bld/
 ScaffoldingReadMe.txt
 secrets.json
 
-# OS generated files
+# OS generated files & report documents
 .DS_Store
 Thumbs.db
+*.docx
+~$*.docx

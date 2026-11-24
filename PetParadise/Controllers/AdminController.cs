@@ -17,13 +17,24 @@ public class AdminController : Controller
     public override void OnActionExecuting(ActionExecutingContext context)
     {
         var role = HttpContext.Session.GetString("Role");
-        string[] staffRoles = { "Admin", "Staff", "Warehouse", "Delivery" };
+        string[] staffRoles = { "Owner", "Admin", "Accounting", "Marketing", "Staff", "Warehouse", "Delivery" };
 
         if (string.IsNullOrEmpty(role) || !staffRoles.Contains(role))
         {
             context.Result = RedirectToAction("Login", "Account");
         }
         base.OnActionExecuting(context);
+    }
+
+    private bool IsAdminOrOwner()
+    {
+        var role = HttpContext.Session.GetString("Role");
+        return role == "Admin" || role == "Owner";
+    }
+
+    private bool IsOwner()
+    {
+        return HttpContext.Session.GetString("Role") == "Owner";
     }
 
     private List<TopSellingProductSummary> GetTopSellingProducts(int limit = 10)
@@ -59,34 +70,52 @@ public class AdminController : Controller
             .ToList();
     }
 
-    // 1. แดชบอร์ดภาพรวม (เฉพาะ Admin)
+    // 1. แดชบอร์ดภาพรวม (เฉพาะ Owner และ Admin)
     [HttpGet]
     public IActionResult Dashboard()
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        if (!IsAdminOrOwner())
             return RedirectToAction("Login", "Account");
 
         PromotionHelper.EnsureDefaultPromotions(_db);
 
-        ViewBag.TotalSales = _db.Orders.Where(o => o.Status != "Cancelled").Sum(o => (decimal?)o.TotalAmount) ?? 0;
+        decimal totalSales = _db.Orders.Where(o => o.Status != "Cancelled").Sum(o => (decimal?)o.TotalAmount) ?? 0m;
+        decimal totalVat = _db.Orders.Where(o => o.Status != "Cancelled").Sum(o => (decimal?)o.Vat) ?? 0m;
+        ViewBag.TotalSales = totalSales;
         ViewBag.TotalOrders = _db.Orders.Count();
         ViewBag.PendingOrders = _db.Orders.Count(o => o.Status == "Pending");
         ViewBag.TotalCustomers = _db.Users.Count(u => u.Role == "Customer");
         ViewBag.LowStockProducts = _db.Products.Where(p => p.StockQuantity <= 5).ToList();
         ViewBag.TopSellingProducts = GetTopSellingProducts(5);
 
+        // ข้อมูลเชิงลึกเฉพาะเจ้าของกิจการ (Owner เท่านั้นที่เห็น Admin ไม่สามารถเห็นได้)
+        if (IsOwner())
+        {
+            decimal netRevenueExVat = Math.Max(0m, totalSales - totalVat);
+            ViewBag.NetRevenueExVat = netRevenueExVat;
+            ViewBag.EstimatedGrossProfit = Math.Round(netRevenueExVat * 0.35m, 2);
+            ViewBag.TotalInventoryValuation = _db.Products.Sum(p => (decimal?)(p.Price * p.StockQuantity)) ?? 0m;
+            ViewBag.TotalAdminCount = _db.Users.Count(u => u.Role == "Admin");
+            ViewBag.TotalStaffCount = _db.Users.Count(u => u.Role != "Customer" && u.Role != "Owner");
+        }
+
         var notes = PromotionHelper.LoadSystemNotes();
         ViewBag.WarehouseIssues = notes.WarehouseIssues.Where(i => !i.IsResolved).OrderByDescending(i => i.ReportedAt).ToList();
+
+        var verifyDict = (notes.PetVerifications ?? new List<PetVerificationNote>()).ToDictionary(p => p.PetId, p => p.Status);
+        var allPetIds = _db.Pets.Select(p => p.PetId).ToList();
+        ViewBag.PendingPetsCount = allPetIds.Count(id => !verifyDict.ContainsKey(id) || verifyDict[id] == "Pending");
 
         var recentOrders = _db.Orders.Include(o => o.User).OrderByDescending(o => o.OrderDate).Take(5).ToList();
         return View(recentOrders);
     }
 
-    // 1.1 หน้ารายงาน (รายงานยอดขาย, รายงานจำนวนคำสั่งซื้อ, รายงานสินค้าขายดี, รายงานสินค้าคงเหลือ)
+    // 1.1 หน้ารายงาน (รายงานยอดขาย, รายงานจำนวนคำสั่งซื้อ, รายงานสินค้าขายดี, รายงานสินค้าคงเหลือ) - Owner, Admin, Accounting, Marketing
     [HttpGet]
     public IActionResult Reports()
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        var role = HttpContext.Session.GetString("Role");
+        if (role != "Owner" && role != "Admin" && role != "Accounting" && role != "Marketing")
             return RedirectToAction("Login", "Account");
 
         var allOrders = _db.Orders
@@ -112,20 +141,29 @@ public class AdminController : Controller
         ViewBag.CancelledCount = allOrders.Count(o => o.Status == "Cancelled");
 
         ViewBag.TopSellingProducts = GetTopSellingProducts(20);
-        ViewBag.AllProductsInventory = _db.Products
+        var allInventory = _db.Products
             .Include(p => p.Category)
             .OrderBy(p => p.StockQuantity)
             .ToList();
+        ViewBag.AllProductsInventory = allInventory;
+
+        if (IsOwner())
+        {
+            decimal netRev = Math.Max(0m, (decimal)ViewBag.TotalSales - (decimal)ViewBag.TotalVat);
+            ViewBag.NetRevenueExVat = netRev;
+            ViewBag.EstimatedGrossProfit = Math.Round(netRev * 0.35m, 2);
+            ViewBag.TotalInventoryValuation = allInventory.Sum(p => p.Price * p.StockQuantity);
+        }
 
         return View(allOrders);
     }
 
-    // 2. จัดการคำสั่งซื้อและตรวจการชำระเงิน (Admin & Staff)
+    // 2. จัดการคำสั่งซื้อและตรวจการชำระเงิน (Owner, Admin, Staff & Accounting)
     [HttpGet]
     public IActionResult Orders(string? statusFilter)
     {
         var role = HttpContext.Session.GetString("Role");
-        if (role != "Admin" && role != "Staff")
+        if (!IsAdminOrOwner() && role != "Staff" && role != "Accounting")
             return RedirectToAction("Login", "Account");
 
         var query = _db.Orders
@@ -138,16 +176,21 @@ public class AdminController : Controller
         if (!string.IsNullOrEmpty(statusFilter))
             query = query.Where(o => o.Status == statusFilter);
 
+        var notes = PromotionHelper.LoadSystemNotes();
+        var verifyDict = (notes.PetVerifications ?? new List<PetVerificationNote>()).ToDictionary(p => p.PetId, p => p.Status);
+        var allPetIds = _db.Pets.Select(p => p.PetId).ToList();
+        ViewBag.PendingPetsCount = allPetIds.Count(id => !verifyDict.ContainsKey(id) || verifyDict[id] == "Pending");
+
         ViewBag.StatusFilter = statusFilter;
         return View(query.OrderByDescending(o => o.OrderDate).ToList());
     }
 
-    // 3. หน้างานคลังสินค้า (Admin, Warehouse & Staff)
+    // 3. หน้างานคลังสินค้า (Owner, Admin, Warehouse & Staff)
     [HttpGet]
     public IActionResult Warehouse()
     {
         var role = HttpContext.Session.GetString("Role");
-        if (role != "Admin" && role != "Warehouse" && role != "Staff")
+        if (!IsAdminOrOwner() && role != "Warehouse" && role != "Staff")
             return RedirectToAction("Login", "Account");
 
         ViewBag.OrdersToPack = _db.Orders
@@ -223,12 +266,12 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Warehouse));
     }
 
-    // 5. หน้างานพนักงานจัดส่งสินค้า (Admin & Delivery)
+    // 5. หน้างานพนักงานจัดส่งสินค้า (Owner, Admin & Delivery)
     [HttpGet]
     public IActionResult Delivery()
     {
         var role = HttpContext.Session.GetString("Role");
-        if (role != "Admin" && role != "Delivery")
+        if (!IsAdminOrOwner() && role != "Delivery")
             return RedirectToAction("Login", "Account");
 
         var deliveryOrders = _db.Orders
@@ -295,6 +338,17 @@ public class AdminController : Controller
 
         if (order != null)
         {
+            var role = HttpContext.Session.GetString("Role");
+            if (role == "Accounting")
+            {
+                string[] allowedForAccounting = { "Pending", "Paid", "Cancelled" };
+                if (!allowedForAccounting.Contains(newStatus))
+                {
+                    TempData["Error"] = "ฝ่ายบัญชีและการเงิน (Accounting) สามารถเปลี่ยนสถานะได้เฉพาะการตรวจสอบยอดเงิน (Pending / Paid / Cancelled) เท่านั้น";
+                    return !string.IsNullOrEmpty(returnUrl) ? Redirect(returnUrl) : RedirectToAction(nameof(Orders));
+                }
+            }
+
             if (order.Status == "Cancelled" || order.Status == "Completed")
             {
                 TempData["Error"] = $"คำสั่งซื้อ #{orderId} อยู่ในสถานะ {order.Status} แล้ว ไม่สามารถเปลี่ยนแปลงสถานะได้อีก";
@@ -323,14 +377,21 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Orders));
     }
 
-    // 7. หน้าจัดการผู้ใช้งานและกำหนด Role ทั้ง 5 ตำแหน่ง (เฉพาะ Admin)
+    // 7. หน้าจัดการผู้ใช้งานและกำหนด Role (Owner เห็นทุกคนและแก้ได้ทุกตำแหน่ง / Admin ไม่เห็น Owner และแก้ไข Role ตัวเองไม่ได้)
     [HttpGet]
     public IActionResult Users(string? roleFilter)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        if (!IsAdminOrOwner())
             return RedirectToAction("Login", "Account");
 
         var query = _db.Users.AsQueryable();
+
+        // Admin ไม่สามารถมองเห็นบัญชีของ Owner ได้
+        if (!IsOwner())
+        {
+            query = query.Where(u => u.Role != "Owner");
+        }
+
         if (!string.IsNullOrEmpty(roleFilter))
             query = query.Where(u => u.Role == roleFilter);
 
@@ -342,7 +403,7 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult CreateUser(User user)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        if (!IsAdminOrOwner())
             return RedirectToAction("Login", "Account");
 
         ModelState.Remove("Addresses");
@@ -350,6 +411,13 @@ public class AdminController : Controller
         ModelState.Remove("Orders");
         ModelState.Remove("Pets");
         ModelState.Remove("Reviews");
+
+        // Admin ไม่สามารถสร้างบัญชีระดับ Owner ได้
+        if (!IsOwner() && user.Role == "Owner")
+        {
+            TempData["Error"] = "เฉพาะเจ้าของกิจการ (Owner) เท่านั้นที่สามารถสร้างบัญชีระดับ Owner ได้";
+            return RedirectToAction(nameof(Users));
+        }
 
         if (_db.Users.Any(u => u.Username == user.Username || u.Email == user.Email))
         {
@@ -372,12 +440,26 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult UpdateUserRole(int userId, string newRole)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        if (!IsAdminOrOwner())
             return RedirectToAction("Login", "Account");
+
+        int? currentUserId = HttpContext.Session.GetInt32("UserId");
+        if (userId == currentUserId)
+        {
+            TempData["Error"] = "ไม่สามารถแก้ไขตำแหน่ง (Role) ของบัญชีตัวเองได้";
+            return RedirectToAction(nameof(Users));
+        }
 
         var user = _db.Users.Find(userId);
         if (user != null)
         {
+            // Admin ไม่สามารถแก้ไขบัญชีของ Owner หรือตั้งใครเป็น Owner ได้
+            if (!IsOwner() && (user.Role == "Owner" || newRole == "Owner"))
+            {
+                TempData["Error"] = "ผู้ดูแลระบบ (Admin) ไม่สามารถแก้ไขสิทธิ์ของเจ้าของกิจการ (Owner) ได้";
+                return RedirectToAction(nameof(Users));
+            }
+
             user.Role = newRole;
             _db.SaveChanges();
             TempData["Success"] = $"เปลี่ยนสิทธิ์ของ {user.Username} เป็น {newRole} เรียบร้อยแล้ว";
@@ -390,7 +472,7 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult DeleteUser(int userId)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        if (!IsAdminOrOwner())
             return RedirectToAction("Login", "Account");
 
         int? currentUserId = HttpContext.Session.GetInt32("UserId");
@@ -403,6 +485,12 @@ public class AdminController : Controller
         var user = _db.Users.Find(userId);
         if (user != null)
         {
+            if (!IsOwner() && user.Role == "Owner")
+            {
+                TempData["Error"] = "ไม่สามารถลบบัญชีของเจ้าของกิจการ (Owner) ได้";
+                return RedirectToAction(nameof(Users));
+            }
+
             if (_db.Orders.Any(o => o.UserId == userId))
             {
                 TempData["Error"] = "ไม่สามารถลบผู้ใช้นี้ได้ เนื่องจากมีประวัติคำสั่งซื้ออยู่ในระบบ";
@@ -417,11 +505,12 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Users));
     }
 
-    // 8. หน้าจัดการโปรโมชั่นทั้งหมด (เฉพาะ Admin)
+    // 8. หน้าจัดการโปรโมชั่นทั้งหมด (Owner, Admin & Marketing)
     [HttpGet]
     public IActionResult Promotions()
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        var role = HttpContext.Session.GetString("Role");
+        if (!IsAdminOrOwner() && role != "Marketing")
             return RedirectToAction("Login", "Account");
 
         PromotionHelper.EnsureDefaultPromotions(_db);
@@ -435,7 +524,8 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult CreatePromotion(Promotion promo, string? promoCode)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        var role = HttpContext.Session.GetString("Role");
+        if (!IsAdminOrOwner() && role != "Marketing")
             return RedirectToAction("Login", "Account");
 
         ModelState.Remove("Orders");
@@ -466,7 +556,8 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult EditPromotion(Promotion promo, string? promoCode)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        var role = HttpContext.Session.GetString("Role");
+        if (!IsAdminOrOwner() && role != "Marketing")
             return RedirectToAction("Login", "Account");
 
         var existing = _db.Promotions.Find(promo.PromotionId);
@@ -504,7 +595,8 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult TogglePromotionStatus(int promotionId)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        var role = HttpContext.Session.GetString("Role");
+        if (!IsAdminOrOwner() && role != "Marketing")
             return RedirectToAction("Login", "Account");
 
         var promo = _db.Promotions.Find(promotionId);
@@ -523,7 +615,8 @@ public class AdminController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult DeletePromotion(int promotionId)
     {
-        if (HttpContext.Session.GetString("Role") != "Admin")
+        var role = HttpContext.Session.GetString("Role");
+        if (!IsAdminOrOwner() && role != "Marketing")
             return RedirectToAction("Login", "Account");
 
         var promo = _db.Promotions.Find(promotionId);
@@ -541,5 +634,68 @@ public class AdminController : Controller
         }
 
         return RedirectToAction(nameof(Promotions));
+    }
+
+    // 12. หน้าตรวจสอบและยืนยันรูปภาพสัตว์เลี้ยงของลูกค้า (Staff, Admin & Owner)
+    [HttpGet]
+    public IActionResult Pets(string? statusFilter)
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (!IsAdminOrOwner() && role != "Staff")
+            return RedirectToAction("Login", "Account");
+
+        var allPets = _db.Pets
+            .Include(p => p.User)
+            .OrderByDescending(p => p.PetId)
+            .ToList();
+
+        var notes = PromotionHelper.LoadSystemNotes();
+        var verifyDict = (notes.PetVerifications ?? new List<PetVerificationNote>())
+            .ToDictionary(p => p.PetId, p => p);
+
+        if (!string.IsNullOrEmpty(statusFilter))
+        {
+            allPets = allPets.Where(p =>
+            {
+                string st = verifyDict.ContainsKey(p.PetId) ? verifyDict[p.PetId].Status : "Pending";
+                return st == statusFilter;
+            }).ToList();
+        }
+
+        ViewBag.PetVerifications = verifyDict;
+        ViewBag.StatusFilter = statusFilter;
+        return View(allPets);
+    }
+
+    // 12.1 กดยืนยัน (Approve) หรือ ปฏิเสธ (Reject) รูปสัตว์เลี้ยง (Staff, Admin & Owner)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult VerifyPet(int petId, string decision, string? remark)
+    {
+        var role = HttpContext.Session.GetString("Role");
+        if (!IsAdminOrOwner() && role != "Staff")
+            return RedirectToAction("Login", "Account");
+
+        var pet = _db.Pets.Include(p => p.User).FirstOrDefault(p => p.PetId == petId);
+        if (pet != null)
+        {
+            string status = decision == "Approved" ? "Approved" : "Rejected";
+            string verifiedBy = HttpContext.Session.GetString("Username") ?? role ?? "Staff";
+            var existing = PromotionHelper.GetPetVerification(petId);
+
+            PromotionHelper.SavePetVerification(
+                petId,
+                existing?.ImageUrl,
+                status,
+                verifiedBy,
+                remark?.Trim()
+            );
+
+            TempData["Success"] = status == "Approved"
+                ? $"ยืนยันข้อมูลสัตว์เลี้ยง '{pet.PetName}' ของคุณ {pet.User?.Username} เรียบร้อยแล้ว (ลูกค้าสามารถใช้สิทธิ์โปรโมชั่น Birthday Pet ได้)"
+                : $"ปฏิเสธข้อมูลสัตว์เลี้ยง '{pet.PetName}' เรียบร้อยแล้ว";
+        }
+
+        return RedirectToAction(nameof(Pets));
     }
 }

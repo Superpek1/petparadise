@@ -28,9 +28,26 @@
       "CarrierName": "trunder",
       "DeliveryIssue": "",
       "UpdatedAt": "2026-11-18T14:37:27.0519861+07:00"
+    },
+    {
+      "OrderId": 2,
+      "TrackingNumber": "",
+      "CarrierName": "",
+      "DeliveryIssue": "",
+      "UpdatedAt": "2026-11-25T01:10:06.182035+07:00"
     }
   ],
   "PromoCodes": {
     "7": "\u0E1F\u0E23\u0E35"
-  }
+  },
+  "PetVerifications": [
+    {
+      "PetId": 1,
+      "ImageUrl": "/uploads/pets/pet_1_42b51aa7662c42f28dd73ed88dc85524.png",
+      "Status": "Approved",
+      "VerifiedBy": "1",
+      "VerifiedAt": "2026-11-23T14:38:36.1849429+07:00",
+      "Remark": null
+    }
+  ]
 }
